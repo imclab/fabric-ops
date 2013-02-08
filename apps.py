@@ -55,7 +55,7 @@ def nodeapp(appname, appconfig):
                 sudo('git clone %s .nvm' % _nvm_url, user=appuser)
                 append(os.path.join(homedir, '.profile'), '. ~/.nvm/nvm.sh\n', use_sudo=True)
 
-                sudo('. %s/.nvm/nvm.sh; nvm install %s' % (homedir, _node_version), user=appuser)
+                sudo('. %s/.nvm/nvm.sh; nvm install %s; nvm use %s' % (homedir, _node_version, _node_version), user=appuser)
 
         if exists('%s/signalmaster' % homedir):
             with cd('%s/signalmaster' % homedir):
