@@ -55,6 +55,7 @@ def install(force=False):
             sudo('useradd --system %s' % _username)
             with cd(_tmp_dir):
                 sudo('make install')
+                sudo('ln -s /usr/local/nginx/sbin/nginx /usr/local/sbin/nginx')
 
     upload_template('templates/nginx/nginx.conf', '/etc/nginx/nginx.conf', 
                     context=env.nginx,
