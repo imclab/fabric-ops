@@ -1,5 +1,4 @@
-README.md
-fabric-ops
+# fabric-ops
 
 Copyright (c) 2013 by AndYet
 
@@ -14,6 +13,8 @@ my awesome cow-worker Nathan LaFreniere generated for some
 internal AndYet projects.
 
 
-Contributors
+## Contributors
+
 Mike Taylor <bear@code-bear.com>
+
 Nathan LaFreniere <nathanl@andyet.net>
