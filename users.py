@@ -20,12 +20,13 @@ def adduser(username, keyfile=None, sudoer=False):
     """
     if not common.user_exists(username):        
         sudo('useradd -m -c %s -s /bin/bash %s' % (username, username))
-        if sudoer:
-            sudo('gpasswd -a %s sudo' % username)
-        if keyfile is not None:
-            authorizekey(username, keyfile)
     else:
         print('User %s already exists' % username)
+
+    if sudoer:
+        sudo('gpasswd -a %s sudo' % username)
+    if keyfile is not None:
+        authorizekey(username, keyfile)
 
 @task
 def disableuser(username):
@@ -72,7 +73,7 @@ def authorizekey(username, keyfile):
     """
     Add the key to the user's authorized_keys file                                                                                                                                           
     """
-    remote = ssh_make_directory(username)
+    remote = common.ssh_make_directory(username)
     f = open(keyfile)
     append(remote + os.sep + 'authorized_keys', f.read(), use_sudo=True)
     f.close()
