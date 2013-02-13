@@ -11,6 +11,7 @@ from fabric.colors import *
 from fabric.context_managers import cd
 
 import common
+import apps
 
 _version  = '1.2.6'
 _tarball  = 'nginx-%s.tar.gz' % _version
@@ -49,6 +50,9 @@ def install(force=False):
     if not force and common.user_exists(_username):
         print('nginx user already exists, skipping nginx install')
     else:
+        for p in ('build-essential', 'libpcre3-dev', 'zlib1g-dev'):
+            common.install_package(p)
+
         download()
         build()
         if exists(_tmp_dir):
@@ -62,7 +66,10 @@ def install(force=False):
                     use_sudo=True)
     sudo('chown root:root /etc/nginx/nginx.conf')
 
-    for p in ['ops-common', 'sites-available', 'sites-enabled']:
+    if not exists('/var/log/nginx'):
+        sudo('mkdir /var/log/nginx')
+
+    for p in ['ops-common', 'conf.d']:
         if not exists('/etc/nginx/%s' % p):
             sudo('mkdir /etc/nginx/%s' % p)
 
@@ -73,5 +80,26 @@ def install(force=False):
         sudo('chown root:root /etc/nginx/ops-common/%s' % f)
 
 @task
-def site(siteconfig):
-    print('do something useful here')
+def site(appName):
+    appConfig = apps.getAppConfig(appName)
+
+    if 'nginx' in appConfig:
+        if exists('/etc/nginx'):
+            for siteConfig in appConfig['nginx']:
+                s = ""
+                if 'listen_address' in siteConfig:
+                    s = siteConfig['listen_address']
+                if 'listen_port' in siteConfig:
+                    if len(s) > 0:
+                        s += ':'
+                    s += siteConfig['listen_port']
+                siteConfig['listen'] = s
+
+                upload_template(os.path.join(appConfig['app_dir'], siteConfig['site_template']), '/etc/nginx/conf.d',
+                                context=siteConfig,
+                                use_sudo=True)
+                sudo('chown root:root /etc/nginx/conf.d/%s' % siteConfig['site_template'])
+                sudo('mkdir -p /srv/www/%s' % siteConfig['root'])
+                sudo('chown nginx:nginx /srv/www/%s' % siteConfig['root'])
+        else:
+            print('nginx is not installed, please adjust this hosts to include nginx as a service')

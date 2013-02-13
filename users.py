@@ -16,7 +16,9 @@ import common
 @task
 def adduser(username, keyfile=None, sudoer=False):
     """
-    Create a new user with the specified username. If keyfile is specified, the public key will also be uploaded. If sudoer=True, the user will be added to the sudo group
+    Create a new user with the specified username. 
+    If keyfile is specified, the public key will also be uploaded.
+    If sudoer=True, the user will be added to the sudo group
     """
     if not common.user_exists(username):        
         sudo('useradd -m -c %s -s /bin/bash %s' % (username, username))

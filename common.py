@@ -15,10 +15,20 @@ import json
 
 
 _ourPath = os.getcwd()
-_cfgKeys = ['user', 'key_filename', 'hosts', 'nginx', 'apps']
+_cfgKeys = ['user', 'key_filename', 'hosts', 'nginx', 'app_dir']
 
 def list_files(path):
     return [ f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) ]
+
+def list_dirs(path):
+    return [ d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d)) ]
+
+@task
+def install_package(package):
+    """
+    Install and configure
+    """
+    sudo('DEBIAN_FRONTEND=noninteractive apt-get install -y %s' % package)
 
 def user_exists(username):
     """
@@ -53,10 +63,8 @@ def config(cfgFilename='fabric.cfg'):
     Load a json configuration file that contains values used by
     the fabric environment
     """
-    filename = os.path.join(_ourPath,  cfgFilename)
+    filename = os.path.join(_ourPath, cfgFilename)
     cfg      = json.load(open(filename, 'r'))
-
-    env['andyet'] = {}
 
     for opt in cfg.keys():
         if opt in _cfgKeys:
@@ -74,8 +82,3 @@ def config(cfgFilename='fabric.cfg'):
                         env.roledefs[r].append(hostname)
             else:
                 setattr(env, opt, cfg[opt])
-
-        else:
-            if opt not in env.andyet:
-                env.andyet[opt] = None
-            env.andyet[opt] = cfg[opt]

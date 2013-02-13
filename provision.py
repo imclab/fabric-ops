@@ -48,13 +48,6 @@ def disablex11():
     sed('/etc/ssh/sshd_config', 'X11Forwarding\syes', 'X11Forwarding no', use_sudo=True)
 
 @task
-def install_package(package):
-    """
-    Install and configure
-    """
-    sudo('DEBIAN_FRONTEND=noninteractive apt-get install -y %s' % package)
-
-@task
 def create_instance():
     """
     Create and setup an empty server
@@ -62,24 +55,29 @@ def create_instance():
     pass
 
 @task
-def bootstrap():
+def bootstrap(user=None):
     """
     Bootstrap a single given server
     The server is checked for upgrades and the ops user is
     installed so that fabric can be used going forward
     """
+    if user is None:
+        user = 'root'
+
     print('-'*42)
-    print('Bootstrapping OS for a single host.  Fabric user is being forced to "root".')
+    print('Bootstrapping OS for a single host.  Fabric user is being forced to "%s".' % user)
+    print('NOTE: be aware you may be prompted for a sudo password...')
     print('-'*42)
 
-    env.user = 'root'
+    with settings(user=user):
+        users.adduser('ops', 'ops.keys', True)
 
-    upgrade()
-    disablex11()
-    for p in ('ntp', 'fail2ban', 'screen'):
-        install_package(p)
-    users.adduser('ops', 'ops.keys', True)
-    append('/etc/sudoers', '%ops    ALL=(ALL:ALL) NOPASSWD: ALL\n')
+        append('/etc/sudoers', '%ops    ALL=(ALL:ALL) NOPASSWD: ALL\n', use_sudo=True)
+
+        upgrade()
+        disablex11()
+        for p in ('ntp', 'fail2ban', 'screen', 'build-essential', 'git'):
+            common.install_package(p)
 
     # TODO enable these after we are *sure* things are working with SSH for ops user
     # disableroot()
@@ -90,5 +88,6 @@ def configure():
     """
     Configure the server with the baseline packages
     """
-    for p in ('build-essential', 'git'):
-        install_package(p)
+    # for p in ('build-essential', 'git'):
+    #     common.install_package(p)
+    pass
