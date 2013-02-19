@@ -13,7 +13,6 @@ from fabric.context_managers import cd
 import os
 import json
 
-
 _ourPath = os.getcwd()
 _cfgKeys = ['user', 'key_filename', 'hosts', 'nginx', 'app_dir']
 
@@ -65,6 +64,8 @@ def config(cfgFilename='fabric.cfg'):
     """
     filename = os.path.join(_ourPath, cfgFilename)
     cfg      = json.load(open(filename, 'r'))
+
+    setattr(env, 'our_path', _ourPath)
 
     for opt in cfg.keys():
         if opt in _cfgKeys:

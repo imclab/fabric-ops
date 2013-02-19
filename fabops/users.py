@@ -10,7 +10,7 @@ from fabric.contrib.files import *
 from fabric.colors import *
 from fabric.context_managers import cd
 
-import common
+import fabops.common
 
 
 @task
@@ -20,7 +20,7 @@ def adduser(username, keyfile=None, sudoer=False):
     If keyfile is specified, the public key will also be uploaded.
     If sudoer=True, the user will be added to the sudo group
     """
-    if not common.user_exists(username):        
+    if not fabops.common.user_exists(username):        
         sudo('useradd -m -c %s -s /bin/bash %s' % (username, username))
     else:
         print('User %s already exists' % username)
@@ -35,8 +35,8 @@ def disableuser(username):
     """
     Disable logins for the user by removing their authorized_keys file
     """
-    if common.user_exists(username):
-        userhome = common.get_home(username)
+    if fabops.common.user_exists(username):
+        userhome = fabops.common.get_home(username)
         if not exists('%s/.ssh/authorized_keys.disabled' % userhome):
             sudo('mv %s/.ssh/authorized_keys %s/.ssh/authorized_keys.disabled' % (userhome, userhome))
         else:
@@ -49,8 +49,8 @@ def enableuser(username):
     """
     Enable a disabled user by moving their authorized_keys file back into place
     """
-    if common.user_exists(username):
-        userhome = common.get_home(username)
+    if fabops.common.user_exists(username):
+        userhome = fabops.common.get_home(username)
         if exists('%s/.ssh/authorized_keys.disabled' % userhome, use_sudo=True):
             sudo('mv %s/.ssh/authorized_keys.disabled %s/.ssh/authorized_keys' % (userhome, userhome))
         else:
@@ -63,7 +63,7 @@ def addprivatekey(username, keyfile):
     """
     Adds keyfile to username's home directory as a private key
     """
-    remote = common.ssh_make_directory(username)
+    remote = fabops.common.ssh_make_directory(username)
     upload_template(keyfile, '%s/id_rsa' % remote, use_sudo=True)
     sudo('chown %s:%s %s/id_rsa' % (username, username, remote))
     sudo('chmod 600 %s/id_rsa' % remote)
@@ -75,7 +75,7 @@ def authorizekey(username, keyfile):
     """
     Add the key to the user's authorized_keys file                                                                                                                                           
     """
-    remote = common.ssh_make_directory(username)
+    remote = fabops.common.ssh_make_directory(username)
     f = open(keyfile)
     append(remote + os.sep + 'authorized_keys', f.read(), use_sudo=True)
     f.close()
@@ -87,7 +87,7 @@ def revokekey(username, keyfile):
     """
     Remove the key from the user's authorized_keys file
     """
-    remote = common.ssh_make_directory(username)
+    remote = fabops.common.ssh_make_directory(username)
     f = open(keyfile)
     partial_key = f.read().strip()
     partial_key = re.escape(partial_key.split()[-1])

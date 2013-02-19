@@ -10,8 +10,8 @@ from fabric.contrib.files import *
 from fabric.colors import *
 from fabric.context_managers import cd
 
-import common
-import apps
+import fabops.common
+
 
 _version  = '1.2.6'
 _tarball  = 'nginx-%s.tar.gz' % _version
@@ -80,26 +80,20 @@ def install(force=False):
         sudo('chown root:root /etc/nginx/ops-common/%s' % f)
 
 @task
-def site(appName):
-    appConfig = apps.getAppConfig(appName)
+def site(siteConfig, appConfig):
+    if exists('/etc/nginx'):
+        s = ""
+        if 'listen_address' in siteConfig:
+            s = siteConfig['listen_address']
+        if 'listen_port' in siteConfig:
+            if len(s) > 0:
+                s += ':'
+            s += siteConfig['listen_port']
+        siteConfig['listen'] = s
 
-    if 'nginx' in appConfig:
-        if exists('/etc/nginx'):
-            for siteConfig in appConfig['nginx']:
-                s = ""
-                if 'listen_address' in siteConfig:
-                    s = siteConfig['listen_address']
-                if 'listen_port' in siteConfig:
-                    if len(s) > 0:
-                        s += ':'
-                    s += siteConfig['listen_port']
-                siteConfig['listen'] = s
-
-                upload_template(os.path.join(appConfig['app_dir'], siteConfig['site_template']), '/etc/nginx/conf.d',
-                                context=siteConfig,
-                                use_sudo=True)
-                sudo('chown root:root /etc/nginx/conf.d/%s' % siteConfig['site_template'])
-                sudo('mkdir -p /srv/www/%s' % siteConfig['root'])
-                sudo('chown nginx:nginx /srv/www/%s' % siteConfig['root'])
-        else:
-            print('nginx is not installed, please adjust this hosts to include nginx as a service')
+        upload_template(os.path.join(appConfig['app_dir'], siteConfig['site_template']), '/etc/nginx/conf.d',
+                        context=siteConfig,
+                        use_sudo=True)
+        sudo('chown root:root /etc/nginx/conf.d/%s' % siteConfig['site_template'])
+        sudo('mkdir -p /srv/www/%s' % siteConfig['root'])
+        sudo('chown nginx:nginx /srv/www/%s' % siteConfig['root'])

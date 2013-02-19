@@ -13,9 +13,6 @@ import json
 import os
 
 # import all of our tasks
-import common
-import provision
-import nginx
-import apps
+import fabops
 
-common.config()
+fabops.common.config()
