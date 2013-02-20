@@ -7,5 +7,6 @@
 import fabops.common
 import fabops.users
 import fabops.nginx
+import fabops.haproxy
 import fabops.provision
 import fabops.nodejs

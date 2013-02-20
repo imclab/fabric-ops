@@ -14,7 +14,6 @@ import os
 import json
 
 _ourPath = os.getcwd()
-_cfgKeys = ['user', 'key_filename', 'hosts', 'nginx', 'app_dir']
 
 def list_files(path):
     return [ f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) ]
@@ -68,7 +67,8 @@ def config(cfgFilename='fabric.cfg'):
     setattr(env, 'our_path', _ourPath)
 
     for opt in cfg.keys():
-        if opt in _cfgKeys:
+        if opt in ('user', 'key_filename', 'hosts', 'nginx', 'haproxy', 'app_dir'):
+
             if opt == 'hosts':
                 # "hosts": [ { "host": "96.126.126.143",
                 #              "role": ["app"]

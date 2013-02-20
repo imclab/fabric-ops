@@ -47,11 +47,11 @@ def install(force=False):
 
     Force install by calling as nginx.install:true
     """
-    if not force and common.user_exists(_username):
+    if not force and fabops.common.user_exists(_username):
         print('nginx user already exists, skipping nginx install')
     else:
         for p in ('build-essential', 'libpcre3-dev', 'zlib1g-dev'):
-            common.install_package(p)
+            fabops.common.install_package(p)
 
         download()
         build()
@@ -73,7 +73,7 @@ def install(force=False):
         if not exists('/etc/nginx/%s' % p):
             sudo('mkdir /etc/nginx/%s' % p)
 
-    for f in common.list_files('templates/nginx/ops-common'):
+    for f in fabops.common.list_files('templates/nginx/ops-common'):
         upload_template(os.path.join('templates/nginx/ops-common', f), '/etc/nginx/ops-common',
                         context=env.nginx,
                         use_sudo=True)
@@ -81,6 +81,9 @@ def install(force=False):
 
 @task
 def site(siteConfig, appConfig):
+    if not exists('/etc/nginx'):
+        install()
+
     if exists('/etc/nginx'):
         s = ""
         if 'listen_address' in siteConfig:
@@ -91,7 +94,7 @@ def site(siteConfig, appConfig):
             s += siteConfig['listen_port']
         siteConfig['listen'] = s
 
-        upload_template(os.path.join(appConfig['app_dir'], siteConfig['site_template']), '/etc/nginx/conf.d',
+        upload_template(os.path.join(appConfig['app_config_dir'], siteConfig['site_template']), '/etc/nginx/conf.d',
                         context=siteConfig,
                         use_sudo=True)
         sudo('chown root:root /etc/nginx/conf.d/%s' % siteConfig['site_template'])

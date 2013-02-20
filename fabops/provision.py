@@ -19,8 +19,8 @@ import fabops.users
 
 
 def getAppConfig(appName):
-    appDir     = os.path.join(os.path.abspath(env.app_dir), appName)
-    appCfgFile = os.path.join(appDir, '%s.cfg' % appName)
+    appCfgDir  = os.path.join(os.path.abspath(env.app_dir), appName)
+    appCfgFile = os.path.join(appCfgDir, '%s.cfg' % appName)
 
     print appCfgFile
     if os.path.exists(appCfgFile):
@@ -31,8 +31,8 @@ def getAppConfig(appName):
             print(sys.exc_info())
             appConfig = {}
 
-    appConfig['app_dir']    = appDir
-    appConfig['app_config'] = appCfgFile
+    appConfig['app_config_dir'] = appCfgDir
+    appConfig['app_config']     = appCfgFile
 
     if 'deploy_user' not in appConfig:
         appConfig['deploy_user'] = appConfig['name']
@@ -107,12 +107,29 @@ def app_install(appName=None):
                 if appConfig['app_details']['language'] == 'node':
                     fabops.nodejs.install_app(appConfig)
         else:
-            print('Unable to find (or load) the configuration file for %s in %s [%s]' % (appName, appConfig['app_dir'], appConfig['app_config']))
+            print('Unable to find (or load) the configuration file for %s in %s [%s]' % (appName, appConfig['app_config_dir'], appConfig['app_config']))
 
 @task
 def app_install_all():
     for d in fabops.list_dirs(env.app_dir):
         app_install(d)
+
+@task
+def alerts():
+    if not exists('/opt/sbin'):
+        sudo('mkdir -p /opt/sbin')
+    if not exists('/opt/sbin/alert_email.sh'):
+        upload_template('templates/alerts/alert_email.sh', '/opt/sbin/alert_email.sh', use_sudo=True)
+        sudo('chmod +x /opt/sbin/alert_email.sh')
+    if not exists('/opt/sbin/alert_email.py'):
+        sudo('pip install requests')
+        sudo('pip install sleekxmpp')
+        upload_template('templates/alerts/alert_email.py', '/opt/sbin/alert_email.py', use_sudo=True)
+        sudo('chmod +x /opt/sbin/alert_email.py')
+
+    for s in ('alerts: alert', 'alert: root', 'root: | "/opt/sbin/alert_email.sh"'):
+        if not contains('/etc/aliases', s, use_sudo=True):
+            append('/etc/aliases', s, use_sudo=True)
 
 @task
 def monit(appConfig):
@@ -227,8 +244,10 @@ def bootstrap(user=None):
 
         upgrade()
         disablex11()
-        for p in ('ntp', 'fail2ban', 'screen', 'build-essential', 'git'):
+        for p in ('ntp', 'fail2ban', 'screen', 'build-essential', 'git', 'python-pip'):
             fabops.common.install_package(p)
+
+        alerts()
 
     # TODO enable these after we are *sure* things are working with SSH for ops user
     # disableroot()
