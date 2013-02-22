@@ -1,6 +1,6 @@
 # fabric-ops
 
-Copyright (c) 2013 by AndYet
+Copyright (c) 2013 by &yet
 
 A collection of fabric scripts to make pushing apps to a
 small to medium server pool mangeable.
