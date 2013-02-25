@@ -9,5 +9,6 @@ import fabops.users
 import fabops.nginx
 import fabops.haproxy
 import fabops.redis
+import fabops.riak
 import fabops.provision
 import fabops.nodejs
