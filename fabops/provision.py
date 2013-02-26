@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
+# :copyright: (c) 2013 by &yet
+# :author:    Mike Taylor
+# :license:   BSD 2-Clause
+
 import os
 import json
 import shutil
-
-# :copyright: (c) 2013 by AndYet
-# :author:    Mike Taylor
-# :license:   BSD 2-Clause
 
 from fabric.operations import *
 from fabric.api import *
@@ -16,7 +16,6 @@ from fabric.context_managers import cd
 
 import fabops.common
 import fabops.users
-
 
 def getAppConfig(appName):
     appCfgDir  = os.path.join(os.path.abspath(env.app_dir), appName)

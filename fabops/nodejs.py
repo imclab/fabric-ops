@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# :copyright: (c) 2013 by AndYet
+# :copyright: (c) 2013 by &yet
 # :author:    Mike Taylor
 # :license:   BSD 2-Clause
 
@@ -15,7 +15,6 @@ from fabric.context_managers import cd
 import fabops.common
 import fabops.users
 import fabops.nginx
-
 
 _node_version = 'v0.8.18'
 _nvm_url      = 'https://github.com/creationix/nvm.git'

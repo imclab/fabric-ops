@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# :copyright: (c) 2013 by AndYet
+# :copyright: (c) 2013 by &yet
 # :author:    Mike Taylor
 # :license:   BSD 2-Clause
 
