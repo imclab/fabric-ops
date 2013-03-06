@@ -17,6 +17,14 @@ from fabric.context_managers import cd
 import fabops.common
 import fabops.users
 
+@task
+def devtools(python=False):
+    for p in ('build-essential', 'build-essential', 'git', 'python-virtualenv'):
+        fabops.common.install_package(p)
+
+    if python:
+        fabops.common.install_package('python-dev')
+
 def getAppConfig(appName):
     appCfgDir  = os.path.join(os.path.abspath(env.app_dir), appName)
     appCfgFile = os.path.join(appCfgDir, '%s.cfg' % appName)
@@ -105,6 +113,20 @@ def app_install(appName=None):
             if getAppDetails(appConfig):
                 if appConfig['app_details']['language'] == 'node':
                     fabops.nodejs.install_app(appConfig)
+        else:
+            print('Unable to find (or load) the configuration file for %s in %s [%s]' % (appName, appConfig['app_config_dir'], appConfig['app_config']))
+
+@task
+def app_deploy(appName=None):
+    if appName is None:
+        print('no appName given, nothing to do')
+    else:
+        appConfig = getAppConfig(appName)
+
+        if isinstance(appConfig, dict) and 'name' in appConfig:
+            if fabops.common.user_exists(appConfig['deploy_user']) and getAppDetails(appConfig):
+                if appConfig['app_details']['language'] == 'node':
+                    fabops.nodejs.deploy_app(appConfig)
         else:
             print('Unable to find (or load) the configuration file for %s in %s [%s]' % (appName, appConfig['app_config_dir'], appConfig['app_config']))
 
@@ -243,8 +265,10 @@ def bootstrap(user=None):
 
         upgrade()
         disablex11()
-        for p in ('ntp', 'fail2ban', 'screen', 'build-essential', 'git', 'python-pip'):
+        for p in ('ntp', 'fail2ban', 'screen',):
             fabops.common.install_package(p)
+
+        devtools()
 
         alerts()
 
