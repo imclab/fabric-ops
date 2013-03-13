@@ -67,10 +67,10 @@ def config(cfgFilename='fabric.cfg'):
     setattr(env, 'our_path', _ourPath)
 
     for opt in cfg.keys():
-        if opt in ('user', 'key_filename', 'hosts', 'nginx', 'haproxy', 'redis', 'app_dir'):
+        if opt in ('user', 'key_filename', 'hosts', 'nginx', 'haproxy', 'redis', 'riak', 'app_dir'):
 
             if opt == 'hosts':
-                # "hosts": [ { "host": "96.126.126.143",
+                # "hosts": [ { "host": "data2",
                 #              "role": ["app"]
                 #            }
                 #          ]

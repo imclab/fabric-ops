@@ -7,6 +7,7 @@
 import os
 import json
 import shutil
+import socket
 
 from fabric.operations import *
 from fabric.api import *
@@ -16,6 +17,10 @@ from fabric.context_managers import cd
 
 import fabops.common
 import fabops.users
+
+
+def getIPAddress(hostname):
+    return socket.gethostbyname(hostname)
 
 @task
 def devtools(python=False):
@@ -243,6 +248,41 @@ def create_instance():
     """
     pass
 
+@task
+def set_hostname():
+    """
+    Set the hostname for a server
+    """
+    sudo('echo %s > /etc/hostname' % env.host_string)
+    sudo('/etc/init.d/hostname start')
+    sed('/etc/hosts', '127.0.0.1\slocalhost', '127.0.0.1 localhost %s' % env.host_string, use_sudo=True)
+
+@task
+def enable_iptables():
+    upload_template('templates/iptables/iptables.sh', '/root/iptables.sh', use_sudo=True)
+    sudo('chmod +x /root/iptables.sh')
+
+    ips = []
+    # loop thru app servers and add them if we are a storage server
+    append('/root/iptables.sh', '# Add IP exceptions for our known list of application servers', use_sudo=True)
+    if env.host_string in env.roledefs['redis_api']:
+        for h in env.roledefs['app']:
+            ip = getIPAddress(h)
+            if ip not in ips:
+                ips.append(ip)
+    if env.host_string in env.roledefs['riak']:
+        for h in env.roledefs['app']:
+            ip = getIPAddress(h)
+            if ip not in ips:
+                ips.append(ip)
+
+    for ip in ips:
+        append('/root/iptables.sh', 'iptables -A INPUT  -p tcp --dport 6379 -s %s/32 -m state --state NEW,ESTABLISHED -j ACCEPT' % ip, use_sudo=True)
+        append('/root/iptables.sh', 'iptables -A INPUT  -p tcp --dport 8087 -s %s/32 -m state --state NEW,ESTABLISHED -j ACCEPT' % ip, use_sudo=True)
+
+    append('/root/iptables.sh', 'iptables -A OUTPUT -p tcp --sport 6379 -m state --state ESTABLISHED -j ACCEPT', use_sudo=True)
+    append('/root/iptables.sh', 'iptables -A OUTPUT -p tcp --sport 8087 -m state --state ESTABLISHED -j ACCEPT', use_sudo=True)
+
 @task(default=True)
 def bootstrap(user=None):
     """
@@ -283,4 +323,7 @@ def configure():
     """
     # for p in ('build-essential', 'git'):
     #     fabops.install_package(p)
-    pass
+    disableroot()
+    disablepasswordauth()
+    set_hostname()
+    enable_iptables()

@@ -41,6 +41,7 @@ def build():
             run('make')
 
 @task
+@roles('redis_api')
 def install(force=False):
     """
     Install redis
@@ -61,14 +62,28 @@ def install(force=False):
             sudo('useradd --system %s' % _username)
             with cd(_tmp_dir):
                 sudo('make install')
+                for s in ('redis-check-aof', 'redis-check-dump', 'redis-cli', 'redis-server'):
+                    sudo('mv %s /usr/local/sbin/')
 
     if not exists('/etc/redis'):
         sudo('mkdir /etc/redis')
 
-    for p in env.redis['ports']:
+    for d in (env.redis['logdir'], env.redis['piddir'], env.redis['datadir']):
+        if not exists(d):
+            sudo('mkdir %s' % d)
+        sudo('chown redis:redis %s' % d)
+
+    ports = []
+    # loop thru the roles for the host, find that role in
+    # the redis global config and extract the port number
+    if env.host_string in env.roledefs['redis_api']:
+        ports.append(env.redis['ports']['redis_api'])
+
+    for p in ports:
         d         = env.redis
         d['port'] = p
         s         = 'redis_%s' % p
+        datadir   = os.path.join(env.redis['datadir'], p)
 
         upload_template('templates/redis/redis.conf', '/etc/redis/%s.cfg' % s, 
                         context=d,
@@ -78,3 +93,12 @@ def install(force=False):
         upload_template('templates/redis/upstart.conf', '/etc/init/%s.conf' % s, 
                         context=d,
                         use_sudo=True)
+
+        if not exists(datadir):
+            sudo('mkdir %s' % datadir)
+        sudo('chown redis:redis %s' % datadir)
+
+@task
+@roles('redis_api')
+def setup():
+    execute(install)
