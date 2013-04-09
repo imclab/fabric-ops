@@ -88,7 +88,8 @@ def revokekey(username, keyfile):
     """
     remote = fabops.common.ssh_make_directory(username)
     f = open(keyfile)
-    partial_key = f.read().strip()
-    partial_key = re.escape(partial_key.split()[-1])
+    key = f.read().strip()
     f.close()
-    sudo('sed -i /^ssh-.*%s/d %s' % (partial_key, remote + os.sep + 'authorized_keys'))
+    remoteFile = remote + os.sep + 'authorized_keys'
+    sudo("cp %s %s.tmp" % (remoteFile, remoteFile))
+    sudo("fgrep -v '%s' %s.tmp > %s" % (key, remoteFile, remoteFile))

@@ -21,6 +21,17 @@ _tmp_dir  = '/tmp/riak-%s' % _version
 _username = 'riak'
 _url      = 'http://downloads.basho.com.s3-website-us-east-1.amazonaws.com/riak/%s/%s/ubuntu/lucid/%s' % (_major_version, _version, _package)
 
+
+@task
+@roles('monit')
+def post_install():
+    pass
+    # if exists('/etc/monit/conf.d'):
+    #     upload_template('templates/monit/riak.conf', '/etc/monit/conf.d/riak',
+    #                     context=d,
+    #                     use_sudo=True)
+
+
 @task
 def install(force=False):
     """

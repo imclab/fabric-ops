@@ -207,17 +207,25 @@ def upstart(appConfig):
     sudo('chown %(user)s:%(user)s %(piddir)s' % d)
     sudo('chown %(user)s:%(user)s %(logdir)s' % d)
 
+@task()
+def pin_packages():
+    for p in env.pinned:
+        sudo('echo %s hold | dpkg --set-selections' % p)
+
 @task
-def upgrade():
+def apt_update(quiet=True):
+    """
+    run apt-get update
+    """
+    opts = "-q -q" if quiet else ""
+    sudo("apt-get %s update" % opts)
+
+@task
+def apt_upgrade():
     """
     Update the apt cache and perform an upgrade
     """
-    if sudo('DEBIAN_FRONTEND=noninteractive apt-get update').failed:
-        abort()
-    if sudo('DEBIAN_FRONTEND=noninteractive apt-get upgrade -y').failed:
-        abort()
-    if sudo('DEBIAN_FRONTEND=noninteractive apt-get autoremove -y').failed:
-        abort()
+    sudo('DEBIAN_FRONTEND=noninteractive apt-get upgrade -y')
 
 @task
 def disableroot():
@@ -247,6 +255,35 @@ def create_instance():
     Create and setup an empty server
     """
     pass
+
+@task
+def install_postfix(mailname='localhost'):
+    if not fabops.common.is_installed('postfix'):
+        fabops.common.preseed_package('postfix', {
+            'postfix/main_mailer_type': ('select', 'Internet Site'),
+            'postfix/mailname': ('string', mailname),
+            'postfix/destinations': ('string', '%s, localhost.localdomain, localhost ' % mailname),
+        })
+        fabops.common.install_package('postfix')
+
+@task
+def install_monit():
+    if not fabops.common.is_installed('monit'):
+        fabops.common.install_package('monit')
+        put('templates/monit/monitrc', '/etc/monit/monitrc', use_sudo=True)
+    sudo('chown root:root /etc/monit/monitrc')
+    sudo('chmod 0600 /etc/monit/monitrc')
+
+@task
+def install_munin_node():
+    if not fabops.common.is_installed('munin-node'):
+        fabops.common.install_package('munin-node')
+
+    put('templates/munin/munin-node.conf', '/etc/munin/munin-node.conf', use_sudo=True)
+    put('templates/munin/munin-node_plugins.conf', '/etc/munin/plugin-conf.d/munin-node', use_sudo=True)        
+    sed('/etc/munin/munin-node.conf', 'host_name localhost', 'host_name %s' % env.host_string, use_sudo=True)
+
+    sudo('chown root:root /etc/munin/munin-node.conf')
 
 @task
 def set_hostname():
@@ -283,6 +320,16 @@ def enable_iptables():
     append('/root/iptables.sh', 'iptables -A OUTPUT -p tcp --sport 6379 -m state --state ESTABLISHED -j ACCEPT', use_sudo=True)
     append('/root/iptables.sh', 'iptables -A OUTPUT -p tcp --sport 8087 -m state --state ESTABLISHED -j ACCEPT', use_sudo=True)
 
+@task()
+def add_ops_user(user=None):
+    if user is None:
+        user = 'root'
+
+    with settings(user=user):
+        if not fabops.common.user_exists('ops'):
+            fabops.users.adduser('ops', 'ops.keys', True)
+            append('/etc/sudoers', '%ops    ALL=(ALL:ALL) NOPASSWD: ALL\n', use_sudo=True)
+
 @task(default=True)
 def bootstrap(user=None):
     """
@@ -299,31 +346,21 @@ def bootstrap(user=None):
     print('-'*42)
 
     with settings(user=user):
-        fabops.users.adduser('ops', 'ops.keys', True)
+        add_ops_user(user)
 
-        append('/etc/sudoers', '%ops    ALL=(ALL:ALL) NOPASSWD: ALL\n', use_sudo=True)
-
-        upgrade()
+        apt_upgrade()
         disablex11()
         for p in ('ntp', 'fail2ban', 'screen',):
             fabops.common.install_package(p)
 
+        disableroot()
+        disablepasswordauth()
+        set_hostname()
+        enable_iptables()
         devtools()
-
         alerts()
+        install_monit()
 
     # TODO enable these after we are *sure* things are working with SSH for ops user
     # disableroot()
     # disablepasswordauth()
-
-@task
-def configure():
-    """
-    Configure the server with the baseline packages
-    """
-    # for p in ('build-essential', 'git'):
-    #     fabops.install_package(p)
-    disableroot()
-    disablepasswordauth()
-    set_hostname()
-    enable_iptables()

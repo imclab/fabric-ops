@@ -41,7 +41,23 @@ def build():
             run('make')
 
 @task
-@roles('redis_api')
+def post_install():
+    ports = []
+    # loop thru the roles for the host, find that role in
+    # the redis global config and extract the port number
+    if env.host_string in env.roledefs['redis_api']:
+        ports.append(env.redis['ports']['redis_api'])
+
+    for p in ports:
+        d         = env.redis
+        d['port'] = p
+
+        if exists('/etc/monit/conf.d'):
+            upload_template('templates/monit/redis.conf', '/etc/monit/conf.d/redis_%s' % p,
+                            context=d,
+                            use_sudo=True)
+
+@task
 def install(force=False):
     """
     Install redis
@@ -59,11 +75,15 @@ def install(force=False):
         download()
         build()
         if exists(_tmp_dir):
-            sudo('useradd --system %s' % _username)
+            if not fabops.common.user_exists(_username):
+                sudo('useradd --system %s' % _username)
+
+            sudo('mkdir -p /usr/local/sbin')
             with cd(_tmp_dir):
                 sudo('make install')
                 for s in ('redis-check-aof', 'redis-check-dump', 'redis-cli', 'redis-server'):
-                    sudo('mv %s /usr/local/sbin/')
+                    if exists(s):
+                        sudo('mv %s /usr/local/sbin/' % s)
 
     if not exists('/etc/redis'):
         sudo('mkdir /etc/redis')
@@ -71,7 +91,7 @@ def install(force=False):
     for d in (env.redis['logdir'], env.redis['piddir'], env.redis['datadir']):
         if not exists(d):
             sudo('mkdir %s' % d)
-        sudo('chown redis:redis %s' % d)
+        sudo('chown %s:%s %s' % (_username, _username, d))
 
     ports = []
     # loop thru the roles for the host, find that role in
@@ -97,6 +117,8 @@ def install(force=False):
         if not exists(datadir):
             sudo('mkdir %s' % datadir)
         sudo('chown redis:redis %s' % datadir)
+
+    post_install()
 
 @task
 @roles('redis_api')

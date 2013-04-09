@@ -21,6 +21,27 @@ def list_files(path):
 def list_dirs(path):
     return [ d for d in os.listdir(path) if os.path.isdir(os.path.join(path, d)) ]
 
+def is_installed(package):
+    with settings(hide('running', 'stdout', 'stderr', 'warnings'), warn_only=True):
+        out = run('dpkg -s %s' % package)
+        for line in out.splitlines():
+            if line.startswith("Status: "):
+                s = line[8:]
+                if "installed" in s.split():
+                    return True
+        return False
+
+def preseed_package(package, values):
+    for q_name, _ in values.items():
+        q_type, q_answer = _
+        sudo('echo "%(package)s %(q_name)s %(q_type)s %(q_answer)s" | debconf-set-selections' % locals())
+
+@task
+
+def find_package(package):
+    with settings(warn_only = True):
+        run('dpkg --list | grep "ii  " | grep %s' % package)
+
 @task
 def install_package(package):
     """
@@ -67,7 +88,7 @@ def config(cfgFilename='fabric.cfg'):
     setattr(env, 'our_path', _ourPath)
 
     for opt in cfg.keys():
-        if opt in ('user', 'key_filename', 'hosts', 'nginx', 'haproxy', 'redis', 'riak', 'app_dir'):
+        if opt in ('user', 'key_filename', 'hosts', 'nginx', 'haproxy', 'redis', 'riak', 'app_dir', 'pinned'):
 
             if opt == 'hosts':
                 # "hosts": [ { "host": "data2",
