@@ -24,7 +24,7 @@ def getIPAddress(hostname):
 
 @task
 def devtools(python=False):
-    for p in ('build-essential', 'build-essential', 'git', 'python-virtualenv'):
+    for p in ('build-essential', 'git', 'python-virtualenv'):
         fabops.common.install_package(p)
 
     if python:
@@ -217,15 +217,16 @@ def apt_update(quiet=True):
     """
     run apt-get update
     """
-    opts = "-q -q" if quiet else ""
-    sudo("apt-get %s update" % opts)
+    opts = "-qq" if quiet else ""
+    sudo("apt-get update %s" % opts)
 
 @task
-def apt_upgrade():
+def apt_upgrade(quiet=True):
     """
     Update the apt cache and perform an upgrade
     """
-    sudo('DEBIAN_FRONTEND=noninteractive apt-get upgrade -y')
+    opts = "-qq" if quiet else ""
+    sudo('DEBIAN_FRONTEND=noninteractive apt-get upgrade -y %s' % opts)
 
 @task
 def disableroot():
@@ -296,6 +297,13 @@ def set_hostname():
 
 @task
 def enable_iptables():
+    # TODO need to add saving of /etc/iptables.rules
+    # TODO need to add /etc/network/if-pre-up.d/iptables:
+    #                   #!/bin/sh
+    #                   iptables-restore < /etc/iptables.rules
+    #                   exit 0
+    # TODO chmod +x /etc/network/if-pre-up.d/iptables
+
     upload_template('templates/iptables/iptables.sh', '/root/iptables.sh', use_sudo=True)
     sudo('chmod +x /root/iptables.sh')
 
@@ -348,10 +356,13 @@ def bootstrap(user=None):
     with settings(user=user):
         add_ops_user(user)
 
+        apt_update()
         apt_upgrade()
         disablex11()
-        for p in ('ntp', 'fail2ban', 'screen',):
-            fabops.common.install_package(p)
+        
+        # moved into baseline image
+        #for p in ('ntp', 'fail2ban', 'screen',):
+        #    fabops.common.install_package(p)
 
         disableroot()
         disablepasswordauth()
