@@ -31,13 +31,27 @@ def is_installed(package):
                     return True
         return False
 
+def flatten(source, namespace=None):
+    result = {}
+    for key in source:
+        if namespace is None:
+          s = key
+        else:
+          s = '%s.%s' % (namespace, key)
+        if isinstance(source[key], dict):
+            d = flatten(source[key], s)
+            for k in d:
+              result[k] = d[k]
+        else:
+            result[s] = source[key]
+    return result
+
 def preseed_package(package, values):
     for q_name, _ in values.items():
         q_type, q_answer = _
         sudo('echo "%(package)s %(q_name)s %(q_type)s %(q_answer)s" | debconf-set-selections' % locals())
 
 @task
-
 def find_package(package):
     with settings(warn_only = True):
         run('dpkg --list | grep "ii  " | grep %s' % package)
@@ -86,9 +100,10 @@ def config(cfgFilename='fabric.cfg'):
     cfg      = json.load(open(filename, 'r'))
 
     setattr(env, 'our_path', _ourPath)
+    setattr(env, 'sites',    {})
 
     for opt in cfg.keys():
-        if opt in ('user', 'key_filename', 'hosts', 'nginx', 'haproxy', 'redis', 'riak', 'app_dir', 'pinned'):
+        if opt in ('user', 'key_filename', 'hosts', 'nginx', 'haproxy', 'redis', 'riak', 'app_dir', 'site_dir', 'pinned'):
 
             if opt == 'hosts':
                 # "hosts": [ { "host": "data2",
@@ -102,5 +117,11 @@ def config(cfgFilename='fabric.cfg'):
                         if r not in env.roledefs:
                             env.roledefs[r] = []
                         env.roledefs[r].append(hostname)
+                    if 'site' in h:
+                        sites = h['site']
+                        for site in sites:
+                            if hostname not in env.sites:
+                                env.sites[hostname] = []
+                            env.sites[hostname].append(site)
             else:
                 setattr(env, opt, cfg[opt])

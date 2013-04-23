@@ -79,23 +79,49 @@ def install(force=False):
         sudo('chown root:root /etc/nginx/ops-common/%s' % f)
 
 @task
-def site(siteConfig, appConfig):
+def install_site(siteName, siteConfig):
     if not exists('/etc/nginx'):
         install()
 
     if exists('/etc/nginx'):
-        s = ""
-        if 'listen_address' in siteConfig:
-            s = siteConfig['listen_address']
-        if 'listen_port' in siteConfig:
+        cfg = fabops.common.flatten(siteConfig)
+
+        if 'nginx.root' not in cfg:
+            print('nginx.root not found in site configuration')
+        s = ''
+        if 'nginx.listen' in cfg:
+            s = cfg['nginx.listen']
+        if 'nginx.port' in cfg:
             if len(s) > 0:
                 s += ':'
-            s += siteConfig['listen_port']
-        siteConfig['listen'] = s
+            s += str(cfg['nginx.port'])
+        cfg['nginx.listen'] = s
 
-        upload_template(os.path.join(appConfig['app_config_dir'], siteConfig['site_template']), '/etc/nginx/conf.d',
-                        context=siteConfig,
+        upload_template(os.path.join(siteConfig['site_config_dir'], '%s.nginx' % cfg['name']),
+                        '/etc/nginx/conf.d/%s' % cfg['name'],
+                        context=cfg,
                         use_sudo=True)
-        sudo('chown root:root /etc/nginx/conf.d/%s' % siteConfig['site_template'])
-        sudo('mkdir -p /srv/www/%s' % siteConfig['root'])
-        sudo('chown nginx:nginx /srv/www/%s' % siteConfig['root'])
+        sudo('chown root:root /etc/nginx/conf.d/%s' % cfg['name'])
+        sudo('mkdir -p %s' % cfg['nginx.root'])
+        sudo('chown nginx:nginx %s' % cfg['nginx.root'])
+
+@task
+def deploy_site(siteConfig):
+    """
+    Deploy an installed nginx site
+    """
+    if fabops.common.user_exists(siteConfig['deploy_user']):
+        with settings(user=siteConfig['deploy_user'], key_filename='/home/%s/.ssh/%s' % (siteConfig['deploy_user'], siteConfig['deploy_key'])):
+            tempDir = '/tmp/%s' % siteConfig['name']
+            workDir = os.path.join(tempDir, siteConfig['name'])
+
+            if exists(workDir):
+                run('rm -rf %s' % workDir)
+            else:
+                run('mkdir -p %s' % workDir)
+            
+            run('git clone %s %s' % (siteConfig['repository']['url'], workDir))
+
+            with cd(workDir):
+                run('git checkout %s' % siteConfig['deploy_branch'])
+                sudo('cp %s/* %s' % (workDir, siteConfig['nginx']['root']))

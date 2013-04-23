@@ -30,11 +30,27 @@ def devtools(python=False):
     if python:
         fabops.common.install_package('python-dev')
 
+def getSiteConfig(siteName):
+    siteCfgDir  = os.path.join(os.path.abspath(env.site_dir), siteName)
+    siteCfgFile = os.path.join(siteCfgDir, '%s.cfg' % siteName)
+
+    if os.path.exists(siteCfgFile):
+        try:
+            siteConfig = json.load(open(siteCfgFile, 'r'))
+        except:
+            print('error parsing configuration file %s' % siteCfgFile)
+            print(sys.exc_info())
+            siteConfig = {}
+
+    siteConfig['site_config_dir'] = siteCfgDir
+    siteConfig['site_config']     = siteCfgFile
+
+    return siteConfig
+
 def getAppConfig(appName):
     appCfgDir  = os.path.join(os.path.abspath(env.app_dir), appName)
     appCfgFile = os.path.join(appCfgDir, '%s.cfg' % appName)
 
-    print appCfgFile
     if os.path.exists(appCfgFile):
         try:
             appConfig = json.load(open(appCfgFile, 'r'))
@@ -95,6 +111,39 @@ def getAppDetails(appConfig):
     return result
 
 @task
+def site_install(siteName=None):
+    if siteName is None:
+        print('no siteName given, nothing to do')
+    else:
+        siteConfig = getSiteConfig(siteName)
+
+        if not fabops.common.user_exists(siteConfig['deploy_user']):
+            fabops.users.adduser(siteConfig['deploy_user'], 'ops.keys')
+
+        if fabops.common.user_exists(siteConfig['deploy_user']):
+            fabops.users.addprivatekey(siteConfig['deploy_user'], os.path.join(env.our_path, 'keys', siteConfig['deploy_key']))
+
+        fabops.nginx.install_site(siteName, siteConfig)
+
+        site_deploy(siteName)
+
+@task
+def site_install_all():
+    if env.host_string in env.sites:
+        for site in env.sites[env.host_string]:
+            install_site(site)
+
+@task
+def site_deploy(siteName=None):
+    if siteName is None:
+        print('no siteName given, nothing to do')
+    else:
+        siteConfig = getSiteConfig(siteName)
+
+        if 'nginx' in siteConfig and fabops.common.user_exists(siteConfig['deploy_user']):
+            fabops.nginx.deploy_site(siteConfig)
+
+@task
 def app_install(appName=None):
     if appName is None:
         print('no appName given, nothing to do')
@@ -107,10 +156,6 @@ def app_install(appName=None):
         if fabops.common.user_exists(appConfig['deploy_user']):
             fabops.users.addprivatekey(appConfig['deploy_user'], os.path.join(env.our_path, 'keys', appConfig['deploy_key']))
 
-        if 'nginx' in appConfig:
-            for siteConfig in appConfig['nginx']:
-                fabops.nginx.site(siteConfig, appConfig)
-
         if 'upstart' in appConfig:
             upstart(appConfig)
 
@@ -119,7 +164,7 @@ def app_install(appName=None):
                 if appConfig['app_details']['language'] == 'node':
                     fabops.nodejs.install_app(appConfig)
         else:
-            print('Unable to find (or load) the configuration file for %s in %s [%s]' % (appName, appConfig['app_config_dir'], appConfig['app_config']))
+            print('Unable to find (or load) the configuration file for %s in %s' % (appName, appConfig['app_config_dir']))
 
 @task
 def app_deploy(appName=None):
@@ -133,7 +178,7 @@ def app_deploy(appName=None):
                 if appConfig['app_details']['language'] == 'node':
                     fabops.nodejs.deploy_app(appConfig)
         else:
-            print('Unable to find (or load) the configuration file for %s in %s [%s]' % (appName, appConfig['app_config_dir'], appConfig['app_config']))
+            print('Unable to find (or load) the configuration file for %s in %s' % (appName, appConfig['app_config_dir']))
 
 @task
 def app_install_all():
@@ -338,18 +383,43 @@ def add_ops_user(user=None):
             fabops.users.adduser('ops', 'ops.keys', True)
             append('/etc/sudoers', '%ops    ALL=(ALL:ALL) NOPASSWD: ALL\n', use_sudo=True)
 
-@task(default=True)
+@task()
+def baseline(user=None):
+    """
+    Update a new instance created from a stock Ubuntu image
+    The server is checked for upgrades and the ops user is
+    installed so that fabric can be used going forward
+    """
+    with settings(user='root'):
+        add_ops_user(user)
+
+        apt_update()
+        apt_upgrade()
+        disablex11()
+        
+        for p in ('ntp', 'fail2ban', 'screen',):
+            fabops.common.install_package(p)
+
+        disableroot()
+        disablepasswordauth()
+        enable_iptables()
+        devtools()
+        alerts()
+        install_monit()
+
+
+@task()
 def bootstrap(user=None):
     """
-    Bootstrap a single given server
+    Bootstrap a single given server from our baseline image
     The server is checked for upgrades and the ops user is
     installed so that fabric can be used going forward
     """
     if user is None:
-        user = 'root'
+        user = 'ops'
 
     print('-'*42)
-    print('Bootstrapping OS for a single host.  Fabric user is being forced to "%s".' % user)
+    print('Bootstrapping OS for a single host.  Fabric user is "%s".' % user)
     print('NOTE: be aware you may be prompted for a sudo password...')
     print('-'*42)
 
@@ -371,7 +441,3 @@ def bootstrap(user=None):
         devtools()
         alerts()
         install_monit()
-
-    # TODO enable these after we are *sure* things are working with SSH for ops user
-    # disableroot()
-    # disablepasswordauth()

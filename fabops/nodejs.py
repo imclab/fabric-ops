@@ -67,7 +67,7 @@ def install_app(appConfig):
 @task
 def deploy_app(appConfig):
     """
-    Deploy (aka update) an installed node app
+    Deploy an installed node app
     """
     if fabops.common.user_exists(appConfig['deploy_user']):
         with settings(user=appConfig['deploy_user']):
