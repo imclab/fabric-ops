@@ -59,6 +59,8 @@ def install(force=False):
             with cd(_tmp_dir):
                 sudo('make install')
                 sudo('ln -s /usr/local/nginx/sbin/nginx /usr/local/sbin/nginx')
+        put('templates/nginx/nginx_initd_script', '/etc/init.d/nginx', use_sudo=True)
+        sudo('chmod +x /etc/init.d/nginx')
 
     upload_template('templates/nginx/nginx.conf', '/etc/nginx/nginx.conf', 
                     context=env.nginx,
@@ -125,3 +127,5 @@ def deploy_site(siteConfig):
             with cd(workDir):
                 run('git checkout %s' % siteConfig['deploy_branch'])
                 sudo('cp %s/* %s' % (workDir, siteConfig['nginx']['root']))
+        if sudo('service nginx testconfig'):
+            sudo('service nginx restart')
