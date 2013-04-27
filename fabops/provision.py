@@ -37,6 +37,7 @@ def getSiteConfig(siteName):
     if os.path.exists(siteCfgFile):
         try:
             siteConfig = json.load(open(siteCfgFile, 'r'))
+            print siteConfig
         except:
             print('error parsing configuration file %s' % siteCfgFile)
             print(sys.exc_info())
@@ -121,7 +122,7 @@ def site_install(siteName=None):
             fabops.users.adduser(siteConfig['deploy_user'], 'ops.keys')
 
         if fabops.common.user_exists(siteConfig['deploy_user']):
-            fabops.users.addprivatekey(siteConfig['deploy_user'], os.path.join(env.our_path, 'keys', siteConfig['deploy_key']))
+            fabops.users.adddeploykey(siteConfig['deploy_user'], os.path.join(env.our_path, 'keys', siteConfig['deploy_key']), siteConfig['deploy_key'])
 
         fabops.nginx.install_site(siteName, siteConfig)
 
@@ -131,7 +132,7 @@ def site_install(siteName=None):
 def site_install_all():
     if env.host_string in env.sites:
         for site in env.sites[env.host_string]:
-            install_site(site)
+            site_install(site)
 
 @task
 def site_deploy(siteName=None):
@@ -154,7 +155,7 @@ def app_install(appName=None):
             fabops.users.adduser(appConfig['deploy_user'], 'ops.keys')
 
         if fabops.common.user_exists(appConfig['deploy_user']):
-            fabops.users.addprivatekey(appConfig['deploy_user'], os.path.join(env.our_path, 'keys', appConfig['deploy_key']))
+            fabops.users.adddeploykey(appConfig['deploy_user'], os.path.join(env.our_path, 'keys', appConfig['deploy_key']), appConfig['deploy_key'])
 
         if 'upstart' in appConfig:
             upstart(appConfig)

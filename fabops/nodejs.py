@@ -58,10 +58,6 @@ def install_app(appConfig):
         with settings(user=appConfig['deploy_user']):
             install_Node(appConfig['deploy_user'], nodeVersion,  appConfig['home_dir'])
 
-            if not exists(appConfig['app_dir']):
-                with cd(appConfig['home_dir']):
-                    run('git clone %s %s' % (appConfig['repository']['url'], appConfig['app_dir']))
-
             deploy_app(appConfig)
 
 @task
@@ -70,10 +66,14 @@ def deploy_app(appConfig):
     Deploy an installed node app
     """
     if fabops.common.user_exists(appConfig['deploy_user']):
-        with settings(user=appConfig['deploy_user']):
-            if exists(appConfig['app_dir']):
-                with cd(appConfig['app_dir']):
-                    run('git pull origin %s' % appConfig['deploy_branch'])
+        with settings(user=appConfig['deploy_user'], key_filename='/home/%s/.ssh/%s' % (appConfig['deploy_user'], appConfig['deploy_key'])):
+            with cd(appConfig['home_dir']):
+                if not exists(appConfig['app_dir']):
+                    run('git clone %s %s' % (appConfig['repository']['url'], appConfig['app_dir']))
+
+                if exists(appConfig['app_dir']):
+                    with cd(appConfig['app_dir']):
+                        run('git pull origin %s' % appConfig['deploy_branch'])
 
                 with cd(appConfig['app_dir']):
                     run('. %s/.nvm/nvm.sh; npm install' % appConfig['home_dir'])

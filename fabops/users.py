@@ -12,6 +12,13 @@ from fabric.context_managers import cd
 
 import fabops.common
 
+_sshagent_autostart = """SSHENV=~/.ssh/agent-${HOSTNAME}
+if [ ! -f "${SSHENV}" ]; then
+    ssh-agent > ${SSHENV}
+fi
+. ${SSHENV}"""
+
+
 @task
 def adduser(username, keyfile=None, sudoer=False):
     """
@@ -21,6 +28,7 @@ def adduser(username, keyfile=None, sudoer=False):
     """
     if not fabops.common.user_exists(username):        
         sudo('useradd -m -c %s -s /bin/bash %s' % (username, username))
+        append('/home/%s/.profile' % username, _sshagent_autostart, use_sudo=True)
     else:
         print('User %s already exists' % username)
 
@@ -57,17 +65,28 @@ def enableuser(username):
     else:
         print('User %s does not exist' % username)
 
+def addkeyfile(username, keyfile, keyfilename):
+    remote = fabops.common.ssh_make_directory(username)
+    upload_template(keyfile, '%s/%s' % (remote, keyfilename), use_sudo=True)
+    sudo('chown %s:%s %s/%s' % (username, username, remote, keyfilename))
+    sudo('chmod 600 %s/%s' % (remote, keyfilename))
+
 @task
 def addprivatekey(username, keyfile):
     """
     Adds keyfile to username's home directory as a private key
     """
-    remote = fabops.common.ssh_make_directory(username)
-    upload_template(keyfile, '%s/id_rsa' % remote, use_sudo=True)
-    sudo('chown %s:%s %s/id_rsa' % (username, username, remote))
-    sudo('chmod 600 %s/id_rsa' % remote)
+    addkeyfile(username, keyfile, 'id_rsa')
+
     with settings(warn_only=True):
         sudo("ssh -o StrictHostKeyChecking=no git@github.com", user=username)
+
+@task
+def adddeploykey(username, keyfile, keyfilename):
+    """
+    Adds a deploy keyfile to username's home directory as an additional private key
+    """
+    addkeyfile(username, keyfile, keyfilename)
 
 @task
 def authorizekey(username, keyfile):
