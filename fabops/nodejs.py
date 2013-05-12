@@ -66,7 +66,9 @@ def deploy_app(appConfig):
     Deploy an installed node app
     """
     if fabops.common.user_exists(appConfig['deploy_user']):
-        with settings(user=appConfig['deploy_user'], key_filename='/home/%s/.ssh/%s' % (appConfig['deploy_user'], appConfig['deploy_key'])):
+        with settings(user=appConfig['deploy_user'], use_sudo=True):
+            run('ssh-add .ssh/%s' % appConfig['deploy_key'])
+
             with cd(appConfig['home_dir']):
                 if not exists(appConfig['app_dir']):
                     run('git clone %s %s' % (appConfig['repository']['url'], appConfig['app_dir']))
@@ -75,5 +77,5 @@ def deploy_app(appConfig):
                     with cd(appConfig['app_dir']):
                         run('git pull origin %s' % appConfig['deploy_branch'])
 
-                with cd(appConfig['app_dir']):
-                    run('. %s/.nvm/nvm.sh; npm install' % appConfig['home_dir'])
+            with cd(appConfig['app_dir']):
+                run('. %s/.nvm/nvm.sh; npm install' % appConfig['home_dir'])

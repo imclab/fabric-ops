@@ -16,10 +16,10 @@ _major_version = '1.2'
 _minor_version = '.1'
 
 _version  = '%s%s' % (_major_version, _minor_version)
-_package  = 'riak_%s-1_i386.deb' % _version
+_package  = 'riak_%s-1_amd64.deb' % _version
 _tmp_dir  = '/tmp/riak-%s' % _version
 _username = 'riak'
-_url      = 'http://downloads.basho.com.s3-website-us-east-1.amazonaws.com/riak/%s/%s/ubuntu/lucid/%s' % (_major_version, _version, _package)
+_url      = 'http://downloads.basho.com.s3-website-us-east-1.amazonaws.com/riak/%s/%s/ubuntu/precise/%s' % (_major_version, _version, _package)
 
 
 @task
@@ -33,7 +33,7 @@ def post_install():
 
 
 @task
-def install(force=False):
+def install(force=False, qa=False):
     """
     Install riak
     Prepare Ubuntu to install Riak from the basho repository
@@ -55,11 +55,40 @@ def install(force=False):
     if not exists('/etc/riak'):
         sudo('mkdir /etc/riak')
 
-    for d in (env.riak['logdir'], env.riak['piddir'], env.riak['datadir']):
+    if qa:
+        datadir = '/var/lib/redis'
+    else:
+        datadir = env.riak['datadir']
+
+    for d in (env.riak['logdir'], env.riak['piddir'], datadir):
         if not exists(d):
             sudo('mkdir %s' % d)
-        sudo('chown riak:riak %s' % d)
+        sudo('chown %s:%s %s' % (_username, _username, d))
 
+@task
+def deploy(qa=False):
+    install(qa=qa)
+
+    if qa:
+        dataroot = '/var/lib/riak'
+    else:
+        dataroot = env.riak['datadir']
+
+    d            = env.riak
+    d['datadir'] = dataroot
+    
     # we are unable to use upload_template because riak's config file
     # is nothing *but* python format string dilly-doos - ugh
     put('templates/riak/riak.conf', '/etc/riak/app.config', use_sudo=True)
+
+    # do not believe we need an upstart script as the riak deb installs one
+    # but I kept this here in case we decide to change things later
+    # upload_template('templates/riak/upstart.conf', '/etc/init/%s.conf' % s, 
+    #                 context=d,
+    #                 use_sudo=True)
+
+    if exists('/etc/monit/conf.d'):
+        upload_template('templates/monit/riak.conf', '/etc/monit/conf.d/riak.conf',
+                        context=d,
+                        use_sudo=True)
+

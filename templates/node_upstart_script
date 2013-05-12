@@ -10,7 +10,7 @@ script
         /bin/bash << EOT
         . /home/%(user)s/.nvm/nvm.sh
         cd %(appdir)s
-        NODE_ENV=production NODE_PATH="%(appdir)s" node server 2>&1  >> %(logdir)s/%(logfile)s
+        NODE_ENV=production NODE_PATH="%(appdir)s" %(appstart)s 2>&1  >> %(logdir)s/%(logfile)s
         EOT
 end script
 

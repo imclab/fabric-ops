@@ -115,20 +115,24 @@ def deploy_site(siteConfig):
     """
     if 'repository' in siteConfig:
         if fabops.common.user_exists(siteConfig['deploy_user']):
-            with settings(user=siteConfig['deploy_user'], key_filename='/home/%s/.ssh/%s' % (siteConfig['deploy_user'], siteConfig['deploy_key'])):
-                tempDir = '/tmp/%s' % siteConfig['name']
-                workDir = os.path.join(tempDir, siteConfig['name'])
+            updateFiles = False
+            tempDir     = '/tmp/%s' % siteConfig['name']
+            workDir     = os.path.join(tempDir, siteConfig['name'])
 
-                if exists(workDir):
-                    run('rm -rf %s' % workDir)
-                else:
-                    run('mkdir -p %s' % workDir)
-                
+            if exists(tempDir):
+                sudo('rm -rf %s' % tempDir)
+
+            with settings(user=siteConfig['deploy_user'], use_sudo=True):
+                run('ssh-add %s' % '.ssh/%s' % siteConfig['deploy_key'])
+                run('mkdir -p %s' % workDir)
                 run('git clone %s %s' % (siteConfig['repository']['url'], workDir))
 
                 with cd(workDir):
-                    run('git checkout %s' % siteConfig['deploy_branch'])
-                    sudo('cp %s/* %s' % (workDir, siteConfig['nginx']['root']))
+                    updateFiles = run('git checkout %s' % siteConfig['deploy_branch'])
+
+            if updateFiles:
+                sudo('cp %s/* %s' % (workDir, siteConfig['nginx']['root']))
+
             if sudo('service nginx testconfig'):
                 sudo('service nginx restart')
     else:

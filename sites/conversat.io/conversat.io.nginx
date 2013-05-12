@@ -1,0 +1,18 @@
+    server {
+        server_name  %(nginx.sitename)s;
+
+        listen       %(nginx.port)s;
+        listen       %(nginx.ssl_port)s default_server ssl;
+
+        ssl_certificate     /etc/nginx/star_conversat.io.pem;
+        ssl_certificate_key /etc/nginx/star_conversat.io.key;
+
+        root         %(nginx.root)s;
+
+        error_log    /var/log/nginx/%(nginx.sitename)s.log;
+        access_log   /var/log/nginx/%(nginx.sitename)s.log main;
+
+        location / {
+            try_files $uri /index.html;
+        }
+    }

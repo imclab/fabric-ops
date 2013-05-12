@@ -101,6 +101,7 @@ def config(cfgFilename='fabric.cfg'):
 
     setattr(env, 'our_path', _ourPath)
     setattr(env, 'sites',    {})
+    setattr(env, 'apps',     {})
 
     for opt in cfg.keys():
         if opt in ('user', 'key_filename', 'hosts', 'nginx', 'haproxy', 'redis', 'riak', 'app_dir', 'site_dir', 'pinned'):
@@ -117,8 +118,14 @@ def config(cfgFilename='fabric.cfg'):
                         if r not in env.roledefs:
                             env.roledefs[r] = []
                         env.roledefs[r].append(hostname)
-                    if 'site' in h:
-                        sites = h['site']
+                    if 'apps' in h:
+                        apps = h['apps']
+                        for app in apps:
+                            if hostname not in env.apps:
+                                env.apps[hostname] = []
+                            env.apps[hostname].append(app)
+                    if 'sites' in h:
+                        sites = h['sites']
                         for site in sites:
                             if hostname not in env.sites:
                                 env.sites[hostname] = []

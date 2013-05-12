@@ -44,6 +44,7 @@ def deploy():
                     roles.append(r)
 
             isQA, roles = areWeQA(roles)
+            print isQA, roles
             for r in roles:
                 execute('fabops.andyet.%s' % r, r, qa=isQA, hosts=[ env.host_string, ])
 
@@ -108,3 +109,7 @@ def prod(rolename, qa=False):
 @task
 def andbang_web(rolename, qa=False):
     print "andbang_web", rolename, qa
+
+@task
+def haproxy(rolename, qa=False):
+    fabops.haproxy.install()

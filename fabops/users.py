@@ -88,6 +88,10 @@ def adddeploykey(username, keyfile, keyfilename):
     """
     addkeyfile(username, keyfile, keyfilename)
 
+    with settings(warn_only=True, user=username, use_sudo=True):
+        run('ssh-add .ssh/%s' % keyfilename)
+        run("ssh -o StrictHostKeyChecking=no git@github.com")
+
 @task
 def authorizekey(username, keyfile):
     """

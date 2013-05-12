@@ -30,25 +30,25 @@ def devtools(python=False):
     if python:
         fabops.common.install_package('python-dev')
 
-def getSiteConfig(siteName):
+def getSiteConfig(siteName, qa=False):
     siteCfgDir  = os.path.join(os.path.abspath(env.site_dir), siteName)
     siteCfgFile = os.path.join(siteCfgDir, '%s.cfg' % siteName)
 
     if os.path.exists(siteCfgFile):
         try:
             siteConfig = json.load(open(siteCfgFile, 'r'))
-            print siteConfig
         except:
             print('error parsing configuration file %s' % siteCfgFile)
             print(sys.exc_info())
             siteConfig = {}
 
+    siteConfig['qa']              = qa
     siteConfig['site_config_dir'] = siteCfgDir
     siteConfig['site_config']     = siteCfgFile
 
     return siteConfig
 
-def getAppConfig(appName):
+def getAppConfig(appName, qa=False):
     appCfgDir  = os.path.join(os.path.abspath(env.app_dir), appName)
     appCfgFile = os.path.join(appCfgDir, '%s.cfg' % appName)
 
@@ -60,6 +60,7 @@ def getAppConfig(appName):
             print(sys.exc_info())
             appConfig = {}
 
+    appConfig['qa']             = qa
     appConfig['app_config_dir'] = appCfgDir
     appConfig['app_config']     = appCfgFile
 
@@ -106,33 +107,37 @@ def getAppDetails(appConfig):
                 result = True
         else:
             print('unable to checkout repo for %s [%s]' % (appName, gitRepoUrl))
-    else:
-        print('currently only apps from git repos can be handled - skipping app install')
 
     return result
 
 @task
-def site_install(siteName=None):
+def site_install(siteName=None, qa=False):
     if siteName is None:
         print('no siteName given, nothing to do')
     else:
-        siteConfig = getSiteConfig(siteName)
+        siteConfig = getSiteConfig(siteName, qa=qa)
 
-        if not fabops.common.user_exists(siteConfig['deploy_user']):
-            fabops.users.adduser(siteConfig['deploy_user'], 'ops.keys')
+        print('site_install for %s' % siteName)
+        print(siteConfig)
 
-        if fabops.common.user_exists(siteConfig['deploy_user']):
-            fabops.users.adddeploykey(siteConfig['deploy_user'], os.path.join(env.our_path, 'keys', siteConfig['deploy_key']), siteConfig['deploy_key'])
+        if 'deploy_user' in siteConfig:
+            print('deploy_user setup')
+            if not fabops.common.user_exists(siteConfig['deploy_user']):
+                fabops.users.adduser(siteConfig['deploy_user'], 'ops.keys')
 
-        fabops.nginx.install_site(siteName, siteConfig)
+            if 'deploy_key' in siteConfig:
+                if fabops.common.user_exists(siteConfig['deploy_user']):
+                    fabops.users.adddeploykey(siteConfig['deploy_user'], 
+                                              os.path.join(env.our_path, 'keys', siteConfig['deploy_key']), 
+                                              siteConfig['deploy_key'])
 
-        site_deploy(siteName)
+        if 'haproxy' in siteConfig:
+            execute('fabops.haproxy.install_site', siteName, siteConfig)
 
-@task
-def site_install_all():
-    if env.host_string in env.sites:
-        for site in env.sites[env.host_string]:
-            site_install(site)
+        if 'nginx' in siteConfig:
+            execute('fabops.nginx.install_site', siteName, siteConfig)
+
+            execute('fabops.nginx.deploy_site', siteConfig)
 
 @task
 def site_deploy(siteName=None):
@@ -145,23 +150,27 @@ def site_deploy(siteName=None):
             fabops.nginx.deploy_site(siteConfig)
 
 @task
-def app_install(appName=None):
+def app_install(appName=None, qa=False):
     if appName is None:
         print('no appName given, nothing to do')
     else:
-        appConfig = getAppConfig(appName)
+        appConfig = getAppConfig(appName, qa=qa)
 
         if not fabops.common.user_exists(appConfig['deploy_user']):
             fabops.users.adduser(appConfig['deploy_user'], 'ops.keys')
 
-        if fabops.common.user_exists(appConfig['deploy_user']):
-            fabops.users.adddeploykey(appConfig['deploy_user'], os.path.join(env.our_path, 'keys', appConfig['deploy_key']), appConfig['deploy_key'])
+        if 'deploy_key' in appConfig and fabops.common.user_exists(appConfig['deploy_user']):
+            fabops.users.adddeploykey(appConfig['deploy_user'], 
+                                      os.path.join(env.our_path, 'keys', appConfig['deploy_key']), 
+                                      appConfig['deploy_key'])
 
-        if 'upstart' in appConfig:
-            upstart(appConfig)
+        if getAppDetails(appConfig):
+            if 'upstart' in appConfig:
+                add_app_to_upstart(appConfig)
 
-        if isinstance(appConfig, dict) and 'name' in appConfig:
-            if getAppDetails(appConfig):
+            add_app_to_monit(appConfig)
+
+            if isinstance(appConfig, dict) and 'name' in appConfig:
                 if appConfig['app_details']['language'] == 'node':
                     fabops.nodejs.install_app(appConfig)
         else:
@@ -182,11 +191,6 @@ def app_deploy(appName=None):
             print('Unable to find (or load) the configuration file for %s in %s' % (appName, appConfig['app_config_dir']))
 
 @task
-def app_install_all():
-    for d in fabops.list_dirs(env.app_dir):
-        app_install(d)
-
-@task
 def alerts():
     if not exists('/opt/sbin'):
         sudo('mkdir -p /opt/sbin')
@@ -204,11 +208,11 @@ def alerts():
             append('/etc/aliases', s, use_sudo=True)
 
 @task
-def monit(appConfig):
+def add_app_to_monit(appConfig):
     d = { 'name':        appConfig['name'],
           'user':        appConfig['deploy_user'],
           'appdir':      appConfig['app_dir'],
-          'description': appconfig['description'],
+          'description': appConfig['description'],
           'piddir':      '/var/run/%s/' % appConfig['name'],
           'pidfile':     '%s.pid'       % appConfig['name'],
           'logdir':      '/var/log/%s/' % appConfig['name'],
@@ -222,20 +226,25 @@ def monit(appConfig):
         for t in appConfig['monit']['alerts']:
             d['alerts'] += '%s\n' % t
 
-    if not exists('/etc/monit/conf.d'):
-        fabops.common.install_package('monit')
-
     upload_template('templates/monit/%s.conf' % appConfig['monit']['type'],
                     '/etc/monit/conf.d/%s.conf' % appConfig['name'],
                     context=d,
                     use_sudo=True)
 
 @task
-def upstart(appConfig):
+def add_app_to_upstart(appConfig):
+    packageJson = appConfig['app_details']['package']
+
+    if 'scripts' in packageJson and "start" in packageJson['scripts']:
+        appstart = packageJson['scripts']['start']
+    else:
+        appstart = 'node server'
+
     d = { 'name':        appConfig['name'],
           'user':        appConfig['deploy_user'],
           'appdir':      appConfig['app_dir'],
           'description': appConfig['description'],
+          'appstart':    appstart,
           'piddir':      '/var/run/%s/' % appConfig['name'],
           'pidfile':     '%s.pid'       % appConfig['name'],
           'logdir':      '/var/log/%s/' % appConfig['name'],
@@ -442,3 +451,5 @@ def bootstrap(user=None):
         devtools()
         alerts()
         install_monit()
+
+        sudo('touch /etc/andyet_ops_bootstrap')

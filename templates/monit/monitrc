@@ -17,4 +17,4 @@
    allow @monit           # allow users of group 'monit' to connect (rw)
    allow @users readonly  # allow users of group 'users' to connect readonly
 
-   include /etc/monit/conf.d/*
+   include /etc/monit/conf.d/*.conf
