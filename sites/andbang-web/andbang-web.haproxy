@@ -1,4 +1,0 @@
-
-backend www_andbang
-    balance roundrobin
-    server  andbang_www %(haproxy.www)s weight 1 maxconn 2500 check
