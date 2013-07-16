@@ -1,0 +1,51 @@
+{
+    "isProduction": true,
+    "isDev": false,
+    "appFixtures": "%(appDir)s/apps.js",
+    "uid": "",
+    "postageAppKey": "88xZVnHaSU0CoZgw0HXA1uq7jop8xK6X",
+    "http": {
+        "port": %(haproxy.api.port)s
+    },
+    "replSock": "/tmp/dev_api.sock",
+    "logglySettings": {
+        "json": true,
+        "subdomain": "andbang-api",
+        "inputToken": "01e568db-74d1-4179-9ed9-7f04b26dc034",
+        "auth": {
+            "username": "username",
+            "password": "password"
+        }
+    },
+    "mixpanel": {
+        "token": "95acc93098eb3ddc30a76377f281f969",
+        "api_key": "834b940856794e049feae34154cd8cb2",
+        "api_secret": "e5a214fad8fbaacc083b991e406c629f",
+        "default_valid_for": 60
+     },
+    "muxer": {
+        "repl": {
+            "enabled": true,
+            "port": 6884
+        },
+        "http": {
+            "host": "127.0.0.1",
+            "port": 1337
+        },
+        "redis": {
+            "host": "%(dns.redis_api.ip)s",
+            "port": %(dns.redis_api.port)s
+        }
+    },
+    "redis": {
+        "thoonk": {
+            "host": "%(dns.redis_api.ip)s",
+            "port": %(dns.redis_api.port)s
+        }
+    },
+    "bucker": {
+        "app": "%(logDir)s/api.log",
+        "access": "%(logDir)s/api-access.log",
+        "console": true
+    }
+}

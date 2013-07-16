@@ -1,0 +1,8 @@
+
+backend api
+    balance roundrobin
+    server  talky_api %(haproxy.api.ip)s:%(haproxy.api.port)s weight 1 maxconn 2500 check
+
+backend ws
+    balance roundrobin
+    server  talky_api %(haproxy.ws.ip)s:%(haproxy.ws.port)s weight 1 maxconn 2500 check

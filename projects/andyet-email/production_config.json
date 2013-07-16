@@ -1,0 +1,31 @@
+{
+    "isProduction": true,
+    "isDev": false,
+    "uid": "andbang-mixpanel",
+    "postageAppKey": "88xZVnHaSU0CoZgw0HXA1uq7jop8xK6X",
+    "http": {
+        "port": 5001
+    },
+    "mixpanel": {
+        "token": "8dfcd8abd5512c60e67cc1ff81b54160",
+        "api_key": "773f64ff31ccd184bba0bd0d9088b546",
+        "api_secret": "5348a6c6bcfd75a17ae840cb51acbcf9",
+        "default_valid_for": 60
+    },
+    "muxer": {
+        "repl": {
+            "enabled": false,
+            "port": 6884
+        },
+        "redis": {
+            "host": "%(dns.redis_api.ip)s",
+            "port": %(dns.redis_api.port)s,
+        }
+    },
+    "redis": {
+        "thoonk": {
+            "host": "%(dns.redis_api.ip)s",
+            "port": %(dns.redis_api.port)s,
+        }
+    }
+}

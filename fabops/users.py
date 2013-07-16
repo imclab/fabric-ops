@@ -26,9 +26,16 @@ def adduser(username, keyfile=None, sudoer=False):
     If keyfile is specified, the public key will also be uploaded.
     If sudoer=True, the user will be added to the sudo group
     """
-    if not fabops.common.user_exists(username):        
+    if not fabops.common.user_exists(username):
         sudo('useradd -m -c %s -s /bin/bash %s' % (username, username))
         append('/home/%s/.profile' % username, _sshagent_autostart, use_sudo=True)
+
+        sshDir   = fabops.common.ssh_make_directory(username)
+        pkeyFile = '%spkey.sh' % sshDir
+        if not exists(pkeyFile):
+            put('templates/pkey.sh', pkeyFile, use_sudo=True)
+            sudo('chown %s:%s %s' % (username, username, pkeyFile))
+            sudo('chmod 700 %s' % pkeyFile)
     else:
         print('User %s already exists' % username)
 

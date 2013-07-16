@@ -1,0 +1,29 @@
+{
+    "redis": {
+        "host": "localhost",
+        "port": 6379,
+        "db": 0
+    },
+    "baseUrl": "https://andplan.com/",
+    "http": {
+        "port": %(nginx.proxy_port)s
+    },
+    "auth": {
+        "clientId": "9fe72b10fdfe481468e8326969ec1f749d6afdbb",
+        "clientSecret": "eaaf60c82de0b6f0c1de95b0fa241d9183cf0a044a359f024c0cd14f499d779dee51ad0792a78c612d0999fb18469f50306b4f1a9a96915ac4860559775c22ca"
+        },
+    "bucker": {
+        "app": {
+            "filename": "/var/log/%(name)s/andplan-app.log",
+            "format": ":time :level :data",
+            "timestamp": "YYYY-MM-DDTHH:mm:ss"
+        },
+        "access": {
+            "filename": "/var/log/%(name)s/andplan-access.log",
+            "format": ":time :level :data",
+            "timestamp": "YYYY-MM-DDTHH:mm:ss"
+        },
+        "console": false,
+        "level": "info"
+    }
+}

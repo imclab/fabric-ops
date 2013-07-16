@@ -13,7 +13,7 @@ from fabric.context_managers import cd
 import fabops.common
 
 _major_version = '1.5'
-_minor_version = '-dev17'
+_minor_version = '-dev19'
 
 _version   = '%s%s' % (_major_version, _minor_version)
 _tarball   = 'haproxy-%s.tar.gz' % _version
@@ -21,10 +21,17 @@ _tmp_dir   = '/tmp/haproxy-%s' % _version
 _cfg_root  = '/etc/haproxy'
 _site_root = '%s/conf.d' % _cfg_root
 _username  = 'haproxy'
-_configure = ' '.join(['TARGET=linux26',
+_configure = ' '.join(['TARGET=linux2628',
                        'USE_OPENSSL=1',
                        ' USE_PCRE=1',
                       ])
+
+_503_header = """HTTP/1.0 503 Service Unavailable
+Cache-Control: no-cache
+Connection: close
+Content-Type: text/html
+
+"""
 
 if 'dev' in _minor_version:
     s = 'devel/'
@@ -53,7 +60,18 @@ def build():
             run('make %s' % _configure)
 
 @task
-def install(force=False):
+def enable_runit():
+    cfg = { 'name':        'haproxy',
+            'deploy_user': 'haproxy',
+            'logDir':      '/var/log/haproxy'
+          }
+
+    execute('fabops.runit.update_app', cfg, runTemplate='templates/haproxy/haproxy.run', 
+                                            logrunTemplate='templates/haproxy/haproxy.logrun', 
+                                            logconfigTemplate='templates/haproxy/haproxy.logconfig')
+
+@task
+def install(cfg, force=False):
     """
     Install haproxy
     Download, extract, configure and install haproxy if the haproxy
@@ -80,49 +98,65 @@ def install(force=False):
         sudo('mkdir %s/ssl-keys' % _cfg_root)
         sudo('mkdir %s/conf.d'   % _cfg_root)
 
-    env.haproxy['ssl-key'] = '/etc/haproxy/ssl-keys/%s' % env.haproxy['keyfile']
+    sudo('mkdir -p /var/log/haproxy')
+    sudo('chown root:root /var/log/haproxy')
 
-    upload_template('templates/haproxy/haproxy.base', '%s/haproxy.base' % _cfg_root, 
-                    context=env.haproxy,
-                    use_sudo=True)
-    sudo('chown root:root %s/haproxy.base' % _cfg_root)
+    cfg['haproxy.ssl-key'] = '/etc/haproxy/ssl-keys/%s' % cfg['haproxy.pemfile']
+    cfg['ops_header']      = _503_header
 
-    put('keys/%s' % env.haproxy['keyfile'], env.haproxy['ssl-key'], use_sudo=True)
+    put('keys/%s' % cfg['haproxy.pemfile'], cfg['haproxy.ssl-key'], use_sudo=True)
 
-    upload_template('templates/haproxy/503-error.http', '%s/errors/503-error.http' % _cfg_root, 
-                    context=env.haproxy,
-                    use_sudo=True)
+    upload_template('templates/andyet_error.html', '%s/errors/503-error.http' % _cfg_root, 
+                    context=cfg, use_sudo=True)
     sudo('chown root:root %s/errors/503-error.http' % _cfg_root)
 
-    upload_template('templates/haproxy/upstart.conf', '/etc/init/haproxy.conf', 
-                    context=env.haproxy,
-                    use_sudo=True)
+    upload_template('templates/haproxy/haproxy.base', '/etc/haproxy/haproxy.base', context=cfg, use_sudo=True)
+    sudo('chown root:root /etc/haproxy/haproxy.base')
+
+    put('templates/haproxy/49-haproxy.conf', '/etc/rsyslog.d/49-haproxy.conf', use_sudo=True)
+    sudo('chown root:root /etc/rsyslog.d/49-haproxy.conf')
+    sudo('service rsyslog restart')
+
+    enable_runit()
+
 
 @task
-def install_site(siteName, siteConfig):
+def install_site(projectName, projectConfig):
     if not fabops.common.user_exists(_username):
-        install()
+        install(projectConfig)
 
     if fabops.common.user_exists(_username):
-        cfg = fabops.common.flatten(siteConfig)
-        cfgFile = '%s.cfg' % os.path.join(_site_root, cfg['name'])
-        upload_template(os.path.join(siteConfig['site_config_dir'], '%s.haproxy' % cfg['name']),
-                        cfgFile,
-                        context=cfg,
+        configFile = os.path.join(_site_root, '%s.cfg' % projectConfig['name'])
+        upload_template(os.path.join(projectConfig['configDir'], '%s.haproxy' % projectConfig['name']),
+                        configFile,
+                        context=projectConfig,
                         use_sudo=True)
-        sudo('chown root:root %s' % cfgFile)
+        sudo('chown root:root %s' % configFile)
 
-        if not exists('%s/haproxy.acls' % _cfg_root):
-            sudo('touch %s/haproxy.acls' % _cfg_root)
-        if not exists('%s/haproxy.uses' % _cfg_root):
-            sudo('touch %s/haproxy.uses' % _cfg_root)
+        put('templates/haproxy/build_config.sh', '%s/build_config.sh' % _cfg_root, use_sudo=True)
+        sudo('chmod +x %s/build_config.sh' % _cfg_root)
 
-        if 'haproxy.acls' in cfg:
-            for s in cfg['haproxy.acls']:
-                append('%s/haproxy.acls' % _cfg_root, s, use_sudo=True)
+        aclFile  = '%s/haproxy.acls.base' % _cfg_root
+        usesFile = '%s/haproxy.uses.base' % _cfg_root
 
-        if 'haproxy.uses' in cfg:
-            for s in cfg['haproxy.uses']:
-                append('%s/haproxy.uses' % _cfg_root, s, use_sudo=True)
+        if not exists(aclFile):
+            sudo('touch %s' % aclFile)
+        if not exists(usesFile):
+            sudo('touch %s' % usesFile)
 
-        sudo('cat %(cfgRoot)s/haproxy.base %(cfgRoot)s/haproxy.acls %(cfgRoot)s/haproxy.uses %(siteRoot)s/*.cfg > %(cfgRoot)s/haproxy.cfg' % {'cfgRoot': _cfg_root, 'siteRoot': _site_root})
+        if 'haproxy.acls_base' in projectConfig:
+            for s in projectConfig['haproxy.acls_base']:
+                append(aclFile, s, use_sudo=True)
+        if 'haproxy.uses_base' in projectConfig:
+            for s in projectConfig['haproxy.uses_base']:
+                append(usesFile, s, use_sudo=True)
+
+        if 'haproxy.acls' in projectConfig:
+            for s in projectConfig['haproxy.acls']:
+                append('%s/%s.acls' % (_site_root, projectConfig['name']), s, use_sudo=True)
+
+        if 'haproxy.uses' in projectConfig:
+            for s in projectConfig['haproxy.uses']:
+                append('%s/%s.uses' % (_site_root, projectConfig['name']), s, use_sudo=True)
+
+        sudo('/etc/haproxy/build_config.sh')

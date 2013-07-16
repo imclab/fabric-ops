@@ -1,0 +1,100 @@
+server {
+        listen %(nginx.port)s;
+        server_name krtconf.com www.krtconf.com www.realtimeconf.com realtimeconf.com;
+
+        error_log    /var/log/nginx/%(name)s_error.log;
+        access_log   /var/log/nginx/%(name)s_access.log main;
+
+        root %(nginx.root)s/;
+
+        location ~ /\. {
+                deny all;
+                return 404;
+        }
+
+        location / {
+            try_files $uri $uri.html /index.html;
+        }
+
+}
+server {
+        listen %(nginx.port)s;
+        server_name 2013.krtconf.com 2013.realtimeconf.com;
+
+        error_log    /var/log/nginx/2013_realtimeconf.com_error.log;
+        access_log   /var/log/nginx/2013_realtimeconf.com_access.log main;
+
+        root %(nginx.root)s/2013/;
+
+        location ~ /\. {
+                deny all;
+                return 404;
+        }
+
+        location / {
+            try_files $uri $uri.html /index.html;
+        }
+
+}
+server {
+        listen %(nginx.port)s;
+        server_name 2012.krtconf.com 2012.realtimeconf.com;
+
+        error_log    /var/log/nginx/%(name)s.com_error.log;
+        access_log   /var/log/nginx/%(name)s_access.log main;
+
+        root %(nginx.root)s/2012/;
+
+        location ~ /\. {
+                deny all;
+                return 404;
+        }
+
+        location ~* \.(?:ico|gif|jpe?g|png)$ {
+            expires 1h;
+            access_log off;
+
+            add_header Pragma public;
+            add_header Cache-Control "public, must-revalidate, proxy-revalidate";
+        }
+
+        location / {
+            if ($request_filename ~* \.(js|css)$ ) {
+                expires 30m;
+                access_log off;
+            }
+
+            try_files $uri $uri.html $uri/ /index.html;
+        }
+}
+server {
+        listen %(nginx.port)s;
+        server_name 2011.krtconf.com 2011.realtimeconf.com;
+
+        error_log    /var/log/nginx/%(name)s_error.log;
+        access_log   /var/log/nginx/%(name)s_access.log main;
+
+        root %(nginx.root)s/2011/;
+
+        location ~ /\. {
+                deny all;
+                return 404;
+        }
+
+        location ~* \.(?:ico|gif|jpe?g|png)$ {
+            expires 1h;
+            access_log off;
+
+            add_header Pragma public;
+            add_header Cache-Control "public, must-revalidate, proxy-revalidate";
+        }
+
+        location / {
+            if ($request_filename ~* \.(js|css)$ ) {
+                expires 30m;
+                access_log off;
+            }
+
+            try_files $uri $uri.html $uri/ /index.html;
+        }
+}

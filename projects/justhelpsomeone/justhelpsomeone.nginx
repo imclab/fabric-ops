@@ -1,0 +1,17 @@
+    server {
+        listen       %(nginx.port)s;
+        server_name  www.justhelpsomeone.org %(nginx.sitename)s;
+
+        error_log    /var/log/nginx/%(deploy_user)s_error.log;
+        access_log   /var/log/nginx/%(deploy_user)s_access.log main;
+
+        root         %(nginx.root)s;
+
+        location ~ /\. {
+                deny all;
+                return 404;
+        }
+        location / {
+            try_files $uri /index.html;
+        }
+    }

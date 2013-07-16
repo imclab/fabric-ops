@@ -1,0 +1,31 @@
+   server {
+        listen       %(nginx.port)s;;
+        server_name  2013.webrtcamp.com 2013.webrtccamp.com;
+
+        root         %(nginx.root)s;
+
+        error_log    /var/log/nginx/%(name)s_error.log;
+        access_log   /var/log/nginx/%(name)s_access.log main;
+
+        location  / {
+            try_files $uri $uri/ $uri/index.html =404;
+        }
+    }
+   server {
+        listen       80;
+        server_name  webrtcamp.com webrtccamp.com;
+
+        root         %(nginx.root)s;
+
+        error_log    /var/log/nginx/%(name)s_error.log;
+        access_log   /var/log/nginx/%(name)s_access.log main;
+
+        location ~ /\. {
+                deny all;
+                return 404;
+        }
+
+        location  / {
+            rewrite ^/(.*)$ http://2013.webrtccamp.com/$1 break;
+        }
+    }

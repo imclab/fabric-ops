@@ -1,0 +1,12 @@
+{
+    "publicRoot" : "./public",
+
+    "postageApp": {
+        "sendUrl": "https://api.postageapp.com/v.1.0/send_message.json",
+        "apiKey": "YdWHEHSxL22z1qJfYTCsRJTGzE440Ugz"
+    },
+
+    "http": {
+        "port": 3030
+    }
+}

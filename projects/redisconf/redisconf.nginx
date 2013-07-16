@@ -1,0 +1,42 @@
+   server {
+        listen       %(nginx.port)s;
+        server_name  2013.redisconf.com;
+
+        root         %(nginx.root)s;
+
+        error_log    /var/log/nginx/%(name)s_error.log;
+        access_log   /var/log/nginx/%(name)s_access.log main;
+
+        location ~ /\. {
+                deny all;
+                return 404;
+        }
+
+        location /video/ {
+            rewrite ^/video/js/(.*)$ http://redisconf.com/js/$1 break;
+
+            try_files $uri $uri.html;
+        }
+
+        location  / {
+            try_files $uri $uri/index.html /index.html;
+        }
+    }
+   server {
+        listen       %(nginx.port)s;
+        server_name  %(nginx.sitename)s;
+
+        root         %(nginx.root)s;
+
+        error_log    /var/log/nginx/%(name)s_error.log;
+        access_log   /var/log/nginx/%(name)s_access.log main;
+
+        location ~ /\. {
+                deny all;
+                return 404;
+        }
+
+        location  / {
+            rewrite ^/(.*)$ http://2013.redisconf.com/$1 last;
+        }
+    }

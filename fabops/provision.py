@@ -30,124 +30,12 @@ def devtools(python=False):
     if python:
         fabops.common.install_package('python-dev')
 
-def getSiteConfig(siteName, qa=False):
-    siteCfgDir  = os.path.join(os.path.abspath(env.site_dir), siteName)
-    siteCfgFile = os.path.join(siteCfgDir, '%s.cfg' % siteName)
-
-    if os.path.exists(siteCfgFile):
-        try:
-            siteConfig = json.load(open(siteCfgFile, 'r'))
-        except:
-            print('error parsing configuration file %s' % siteCfgFile)
-            print(sys.exc_info())
-            siteConfig = {}
-
-    siteConfig['qa']              = qa
-    siteConfig['site_config_dir'] = siteCfgDir
-    siteConfig['site_config']     = siteCfgFile
-
-    return siteConfig
-
-def getAppConfig(appName, qa=False):
-    appCfgDir  = os.path.join(os.path.abspath(env.app_dir), appName)
-    appCfgFile = os.path.join(appCfgDir, '%s.cfg' % appName)
-
-    if os.path.exists(appCfgFile):
-        try:
-            appConfig = json.load(open(appCfgFile, 'r'))
-        except:
-            print('error parsing configuration file %s' % appCfgFile)
-            print(sys.exc_info())
-            appConfig = {}
-
-    appConfig['qa']             = qa
-    appConfig['app_config_dir'] = appCfgDir
-    appConfig['app_config']     = appCfgFile
-
-    if 'deploy_user' not in appConfig:
-        appConfig['deploy_user'] = appConfig['name']
-
-    appConfig['home_dir'] = '/home/%s' % appConfig['deploy_user']
-    appConfig['app_dir']  = os.path.join(appConfig['home_dir'], appConfig['name'])
-
-    return appConfig
-
-def getAppDetails(appConfig):
-    result = False
-
-    if 'repository' in appConfig and appConfig['repository']['type'] == 'git':
-        appName     = appConfig['name']
-        gitRepoUrl  = appConfig['repository']['url']
-        tempDir     = os.environ['TMPDIR']
-        tempRepoDir = os.path.join(tempDir, appName)
-    
-        appConfig['app_details'] = { 'tempRepoDir': tempRepoDir,
-                                     'language':    None,
-                                   }
-
-        # TODO need to make this work with the app's deploy key
-        with cd(tempDir):
-            if os.path.exists(tempRepoDir):
-                shutil.rmtree(tempRepoDir)
-            local('git clone %s %s' % (gitRepoUrl, tempRepoDir))
-
-        if os.path.exists(tempRepoDir):
-            packageFile = '%s/package.json' % tempRepoDir
-
-            if os.path.exists(packageFile):
-                appConfig['app_details']['language'] = 'node'
-                try:
-                    appConfig['app_details']['package'] = json.load(open(packageFile, 'r'))
-                    result = True
-                except:
-                    print('error loading the package.json file %s' % packageFile)
-                    print(sys.exc_info())
-                    appConfig['app_details']['package'] = {}
-            else:
-                result = True
-        else:
-            print('unable to checkout repo for %s [%s]' % (appName, gitRepoUrl))
-
-    return result
-
 @task
-def site_install(siteName=None, qa=False):
-    if siteName is None:
-        print('no siteName given, nothing to do')
-    else:
-        siteConfig = getSiteConfig(siteName, qa=qa)
+def processcontrol(force=False):
+    for p in ('build-essential', 'runit'):
+        fabops.common.install_package(p)
 
-        print('site_install for %s' % siteName)
-        print(siteConfig)
-
-        if 'deploy_user' in siteConfig:
-            print('deploy_user setup')
-            if not fabops.common.user_exists(siteConfig['deploy_user']):
-                fabops.users.adduser(siteConfig['deploy_user'], 'ops.keys')
-
-            if 'deploy_key' in siteConfig:
-                if fabops.common.user_exists(siteConfig['deploy_user']):
-                    fabops.users.adddeploykey(siteConfig['deploy_user'], 
-                                              os.path.join(env.our_path, 'keys', siteConfig['deploy_key']), 
-                                              siteConfig['deploy_key'])
-
-        if 'haproxy' in siteConfig:
-            execute('fabops.haproxy.install_site', siteName, siteConfig)
-
-        if 'nginx' in siteConfig:
-            execute('fabops.nginx.install_site', siteName, siteConfig)
-
-            execute('fabops.nginx.deploy_site', siteConfig)
-
-@task
-def site_deploy(siteName=None):
-    if siteName is None:
-        print('no siteName given, nothing to do')
-    else:
-        siteConfig = getSiteConfig(siteName)
-
-        if 'nginx' in siteConfig and fabops.common.user_exists(siteConfig['deploy_user']):
-            fabops.nginx.deploy_site(siteConfig)
+    upload_template('templates/runsvdir.conf', '/etc/init/runsvdir.conf', use_sudo=True)
 
 @task
 def app_install(appName=None, qa=False):
@@ -191,6 +79,23 @@ def app_deploy(appName=None):
             print('Unable to find (or load) the configuration file for %s in %s' % (appName, appConfig['app_config_dir']))
 
 @task
+def app_status(appName=None):
+    if appName is None:
+        print('no appName given, nothing to do')
+    else:
+        appConfig = getAppConfig(appName)
+
+        if isinstance(appConfig, dict) and 'name' in appConfig:
+            if fabops.common.user_exists(appConfig['deploy_user']) and getAppDetails(appConfig):
+                with settings(user=appConfig['deploy_user'], use_sudo=True):
+                    run('ssh-add .ssh/%s' % appConfig['deploy_key'])
+
+                    with cd(appConfig['app_dir']):
+                        run('git status')
+        else:
+            print('Unable to find (or load) the configuration file for %s in %s' % (appName, appConfig['app_config_dir']))
+
+@task
 def alerts():
     if not exists('/opt/sbin'):
         sudo('mkdir -p /opt/sbin')
@@ -208,52 +113,50 @@ def alerts():
             append('/etc/aliases', s, use_sudo=True)
 
 @task
-def add_app_to_monit(appConfig):
-    d = { 'name':        appConfig['name'],
-          'user':        appConfig['deploy_user'],
-          'appdir':      appConfig['app_dir'],
-          'description': appConfig['description'],
-          'piddir':      '/var/run/%s/' % appConfig['name'],
-          'pidfile':     '%s.pid'       % appConfig['name'],
-          'logdir':      '/var/log/%s/' % appConfig['name'],
-          'logfile':     '%s.log'       % appConfig['name'],
-          'start':       appConfig['monit']['start'],
-          'stop':        appConfig['monit']['stop'],
+def add_app_to_monit(projectConfig, itemName):
+    d = { 'name':        itemName,
+          'user':        projectConfig['deploy_user'],
+          'appdir':      projectConfig['deploy_dir'],
+          'description': projectConfig['description'],
+          'piddir':      '/var/run/%s/' % itemName,
+          'pidfile':     '%s.pid'       % itemName,
+          'logdir':      '/var/log/%s/' % itemName,
+          'logfile':     '%s.log'       % itemName,
+          'start':       projectConfig['monit.start'],
+          'stop':        projectConfig['monit.stop'],
           'alerts':      '',
         }
 
-    if 'alerts' in appConfig['monit']:
-        for t in appConfig['monit']['alerts']:
+    if 'monit.alerts' in projectConfig:
+        for t in projectConfig['monit.alerts']:
             d['alerts'] += '%s\n' % t
 
-    upload_template('templates/monit/%s.conf' % appConfig['monit']['type'],
-                    '/etc/monit/conf.d/%s.conf' % appConfig['name'],
+    upload_template('templates/monit/%s.conf' % projectConfig['monit.type'],
+                    '/etc/monit/conf.d/%s.conf' % itemName,
                     context=d,
                     use_sudo=True)
 
 @task
-def add_app_to_upstart(appConfig):
-    packageJson = appConfig['app_details']['package']
+def add_app_to_upstart(projectConfig, itemName):
+    # packageJson = projectConfig['app_details.package']
 
-    if 'scripts' in packageJson and "start" in packageJson['scripts']:
-        appstart = packageJson['scripts']['start']
-    else:
-        appstart = 'node server'
+    # if 'scripts' in packageJson and "start" in packageJson['scripts']:
+    #     appstart = packageJson['scripts']['start']
+    # else:
+    #     appstart = 'node server'
+    appstart = 'node server'
 
-    d = { 'name':        appConfig['name'],
-          'user':        appConfig['deploy_user'],
-          'appdir':      appConfig['app_dir'],
-          'description': appConfig['description'],
+    d = { 'name':        itemName,
+          'user':        projectConfig['deploy_user'],
+          'appdir':      '/home/%s/%s' % (projectConfig['deploy_user'], projectConfig['deploy_dir']),
+          'description': projectConfig['description'],
           'appstart':    appstart,
-          'piddir':      '/var/run/%s/' % appConfig['name'],
-          'pidfile':     '%s.pid'       % appConfig['name'],
-          'logdir':      '/var/log/%s/' % appConfig['name'],
-          'logfile':     '%s.log'       % appConfig['name'],
+          'piddir':      '/var/run/%s/' % itemName,
+          'pidfile':     '%s.pid'       % itemName,
+          'logdir':      '/var/log/%s/' % itemName,
+          'logfile':     '%s.log'       % itemName,
         }
 
-    upload_template('templates/node_upstart_script', '/etc/init/%s.conf' % appConfig['name'], 
-                    context=d,
-                    use_sudo=True)
     if not exists(d['piddir']):
         sudo('mkdir %(piddir)s' % d)
     if not exists(d['logdir']):
@@ -261,6 +164,14 @@ def add_app_to_upstart(appConfig):
 
     sudo('chown %(user)s:%(user)s %(piddir)s' % d)
     sudo('chown %(user)s:%(user)s %(logdir)s' % d)
+
+    upload_template('templates/node_upstart_script', '/etc/init/%s.conf' % itemName, 
+                    context=d,
+                    use_sudo=True)
+    upload_template('templates/logrotate', '/etc/logrotate.d/%s' % itemName, 
+                    context=d,
+                    use_sudo=True)
+
 
 @task()
 def pin_packages():
@@ -280,6 +191,8 @@ def apt_upgrade(quiet=True):
     """
     Update the apt cache and perform an upgrade
     """
+    apt_update(quiet)
+    
     opts = "-qq" if quiet else ""
     sudo('DEBIAN_FRONTEND=noninteractive apt-get upgrade -y %s' % opts)
 
@@ -347,41 +260,54 @@ def set_hostname():
     Set the hostname for a server
     """
     sudo('echo %s > /etc/hostname' % env.host_string)
-    sudo('/etc/init.d/hostname start')
+    sudo('start hostname')
     sed('/etc/hosts', '127.0.0.1\slocalhost', '127.0.0.1 localhost %s' % env.host_string, use_sudo=True)
 
 @task
 def enable_iptables():
-    # TODO need to add saving of /etc/iptables.rules
-    # TODO need to add /etc/network/if-pre-up.d/iptables:
-    #                   #!/bin/sh
-    #                   iptables-restore < /etc/iptables.rules
-    #                   exit 0
-    # TODO chmod +x /etc/network/if-pre-up.d/iptables
+    # now done in the baseline image:
+    #    add saving of /etc/iptables.rules
+    #    /etc/network/if-pre-up.d/iptables:
+    #        #!/bin/sh
+    #        iptables-restore < /etc/iptables.rules
+    #        exit 0
+    #    chmod +x /etc/network/if-pre-up.d/iptables
+
+    sudo('mkdir -p /root/iptables_conf.d')
+    sudo('chown root:root /root/iptables_conf.d')
 
     upload_template('templates/iptables/iptables.sh', '/root/iptables.sh', use_sudo=True)
-    sudo('chmod +x /root/iptables.sh')
+    sudo('chmod 500 /root/iptables.sh')
+    sudo('chown root:root /root/iptables.sh')
+    
+    upload_template('templates/iptables/checkiptables.sh', '/root/checkiptables.sh', use_sudo=True)
+    sudo('chmod 500 /root/checkiptables.sh')
+    sudo('chown root:root /root/checkiptables.sh')
 
-    ips = []
-    # loop thru app servers and add them if we are a storage server
-    append('/root/iptables.sh', '# Add IP exceptions for our known list of application servers', use_sudo=True)
-    if env.host_string in env.roledefs['redis_api']:
-        for h in env.roledefs['app']:
-            ip = getIPAddress(h)
-            if ip not in ips:
-                ips.append(ip)
-    if env.host_string in env.roledefs['riak']:
-        for h in env.roledefs['app']:
-            ip = getIPAddress(h)
-            if ip not in ips:
-                ips.append(ip)
+    upload_template('templates/iptables/iptables_redis.sh', '/root/iptables_conf.d/iptables_redis.sh', use_sudo=True)
+    sudo('chmod 500 /root/iptables_conf.d/iptables_redis.sh')
+    sudo('chown root:root /root/iptables_conf.d/iptables_redis.sh')
 
-    for ip in ips:
-        append('/root/iptables.sh', 'iptables -A INPUT  -p tcp --dport 6379 -s %s/32 -m state --state NEW,ESTABLISHED -j ACCEPT' % ip, use_sudo=True)
-        append('/root/iptables.sh', 'iptables -A INPUT  -p tcp --dport 8087 -s %s/32 -m state --state NEW,ESTABLISHED -j ACCEPT' % ip, use_sudo=True)
+    # ips = []
+    # # loop thru app servers and add them if we are a storage server
+    # append('/root/iptables.sh', '# Add IP exceptions for our known list of application servers', use_sudo=True)
+    # if env.host_string in env.roledefs['redis_api']:
+    #     for h in env.roledefs['app']:
+    #         ip = getIPAddress(h)
+    #         if ip not in ips:
+    #             ips.append(ip)
+    # if env.host_string in env.roledefs['riak']:
+    #     for h in env.roledefs['app']:
+    #         ip = getIPAddress(h)
+    #         if ip not in ips:
+    #             ips.append(ip)
 
-    append('/root/iptables.sh', 'iptables -A OUTPUT -p tcp --sport 6379 -m state --state ESTABLISHED -j ACCEPT', use_sudo=True)
-    append('/root/iptables.sh', 'iptables -A OUTPUT -p tcp --sport 8087 -m state --state ESTABLISHED -j ACCEPT', use_sudo=True)
+    # for ip in ips:
+    #     append('/root/iptables.sh', 'iptables -A INPUT  -p tcp --dport 6379 -s %s/32 -m state --state NEW,ESTABLISHED -j ACCEPT' % ip, use_sudo=True)
+    #     append('/root/iptables.sh', 'iptables -A INPUT  -p tcp --dport 8087 -s %s/32 -m state --state NEW,ESTABLISHED -j ACCEPT' % ip, use_sudo=True)
+
+    # append('/root/iptables.sh', 'iptables -A OUTPUT -p tcp --sport 6379 -m state --state ESTABLISHED -j ACCEPT', use_sudo=True)
+    # append('/root/iptables.sh', 'iptables -A OUTPUT -p tcp --sport 8087 -m state --state ESTABLISHED -j ACCEPT', use_sudo=True)
 
 @task()
 def add_ops_user(user=None):
@@ -414,6 +340,7 @@ def baseline(user=None):
         disablepasswordauth()
         enable_iptables()
         devtools()
+        processcontrol()
         alerts()
         install_monit()
 
@@ -449,7 +376,10 @@ def bootstrap(user=None):
         set_hostname()
         enable_iptables()
         devtools()
+        processcontrol()
         alerts()
-        install_monit()
+        # install_monit()
+
+        upload_template('templates/screenrc', '/home/ops/.screenrc', use_sudo=True)
 
         sudo('touch /etc/andyet_ops_bootstrap')

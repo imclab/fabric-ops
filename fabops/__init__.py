@@ -6,6 +6,8 @@
 
 import fabops.common
 import fabops.users
+import fabops.stun
+import fabops.runit
 import fabops.nginx
 import fabops.haproxy
 import fabops.redis

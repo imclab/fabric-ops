@@ -42,40 +42,62 @@ def install_Node(user, nodeVersion, installDir):
             run('. %s/.nvm/nvm.sh; nvm use %s; nvm alias default %s' % (installDir, nodeVersion, nodeVersion))
 
 @task
-def install_app(appConfig):
-    """
-    Install a node app
-    """
-    packageJson = appConfig['app_details']['package']
-
-    if 'engines' in packageJson:
-        nodeVersion = packageJson['engines']['node']
-        nodeVersion = 'v%s' % nodeVersion.split('=', 1)[1]
-    else:
-        nodeVersion = _node_version
-
-    if fabops.common.user_exists(appConfig['deploy_user']):
-        with settings(user=appConfig['deploy_user']):
-            install_Node(appConfig['deploy_user'], nodeVersion,  appConfig['home_dir'])
-
-            deploy_app(appConfig)
-
-@task
-def deploy_app(appConfig):
+def deploy(projectConfig, force=True):
     """
     Deploy an installed node app
+
+    assumes deploy user is already enabled
     """
-    if fabops.common.user_exists(appConfig['deploy_user']):
-        with settings(user=appConfig['deploy_user'], use_sudo=True):
-            run('ssh-add .ssh/%s' % appConfig['deploy_key'])
+    with settings(user=projectConfig['deploy_user'], use_sudo=True):
+        repoKey = None
+        if 'repo_keys' in projectConfig:
+            repoKey = projectConfig['repo_keys'][0]
+            projectConfig['repoKey'] = repoKey
+        else:
+            projectConfig['repoKey'] = ''
+            # for repoKey in projectConfig['repo_keys']:
+            #     run('ssh-add .ssh/%s' % repoKey)
 
-            with cd(appConfig['home_dir']):
-                if not exists(appConfig['app_dir']):
-                    run('git clone %s %s' % (appConfig['repository']['url'], appConfig['app_dir']))
+        # if 'engines' in packageJson:
+        #     nodeVersion = packageJson['engines']['node']
+        #     if '=' in nodeVersion:
+        #         nodeVersion = 'v%s' % nodeVersion.split('=', 1)[1]
+        #     elif nodeVersion.startswith('~'):
+        #         nodeVersion = nodeVersion[1:]
+        # else:
+        #     nodeVersion = _node_version
+        if 'node' in projectConfig:
+            nodeVersion = projectConfig['node']
+        else:
+            nodeVersion = _node_version
 
-                if exists(appConfig['app_dir']):
-                    with cd(appConfig['app_dir']):
-                        run('git pull origin %s' % appConfig['deploy_branch'])
+        if force and not exists(os.path.join(projectConfig['homeDir'], '.nvm')):
+            install_Node(projectConfig['deploy_user'], nodeVersion,  projectConfig['homeDir'])
 
-            with cd(appConfig['app_dir']):
-                run('. %s/.nvm/nvm.sh; npm install' % appConfig['home_dir'])
+        if not exists(projectConfig['deploy_dir']):
+            run('ssh-add -D; ssh-add ~/.ssh/%s' % projectConfig['deploy_key'])
+            run('git clone %s %s' % (projectConfig['repository.url'], projectConfig['deploy_dir']))
+
+        if exists(projectConfig['deploy_dir']):
+            with cd(projectConfig['deploy_dir']):
+                run('ssh-add -D; ssh-add ~/.ssh/%s' % projectConfig['deploy_key'])
+                run('git pull origin %s' % projectConfig['deploy_branch'])
+                run('git checkout %s' % projectConfig['deploy_branch'])
+
+                if repoKey is not None:
+                    run('ssh-add -D; ssh-add ~/.ssh/%s' % repoKey)
+                run('. %s/.nvm/nvm.sh; npm install --production --color=false' % projectConfig['homeDir'])
+
+        upload_template('templates/project_deploy.sh', 'deploy.sh', context=projectConfig)
+        run('chmod +x %s' % os.path.join(projectConfig['homeDir'], 'deploy.sh'))
+
+        if 'config_dir' in projectConfig:
+            appConfigDir = projectConfig['config_dir']
+        else:
+            appConfigDir = projectConfig['appDir']
+
+        appConfigDir = os.path.join(projectConfig['homeDir'], appConfigDir)
+
+        upload_template(os.path.join(projectConfig['configDir'], 'production_config.json'),
+                        os.path.join(appConfigDir,               'production_config.json'),
+                        context=projectConfig)

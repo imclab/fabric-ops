@@ -4,6 +4,9 @@
 # :author:    Mike Taylor
 # :license:   BSD 2-Clause
 
+import os
+import json
+
 from fabric.operations import *
 from fabric.api import *
 from fabric.contrib.files import *
@@ -13,103 +16,262 @@ from fabric.context_managers import cd
 import fabops.common
 import fabops.redis
 
-def areWeQA(roles):
-    """Look at list of roles and see if QA is included.
-
-    If so, remove it from roles and set the returned flag to True
-    """
-    flag   = False
-    target = None
-    for s in roles:
-        if s.lower() == 'qa':
-            flag   = True
-            target = s
-            break
-    if flag:
-        roles = [ r for r in roles if r != target ]
-    return flag, roles
 
 @task
-def deploy():
-    if not exists('/etc/andyet_ops_bootstrap'):
-        execute('fabops.provision.bootstrap')
-
-    if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
-        roles = []
-        isQA  = False
-
-        if len(env.roles) == 0:
-            for r in env.roledefs:
-                if env.host_string in env.roledefs[r]:
-                    roles.append(r)
-
-            isQA, roles = areWeQA(roles)
-            print isQA, roles
-            for r in roles:
-                execute('fabops.andyet.%s' % r, r, qa=isQA, hosts=[ env.host_string, ])
-
-            if env.host_string in env.sites:
-                for site in env.sites[env.host_string]:
-                    execute('fabops.provision.site_install', site, qa=isQA)
-
-            if env.host_string in env.apps:
-                for app in env.apps[env.host_string]:
-                    execute('fabops.provision.app_install', app, qa=isQA)
-        else:
-            isQA, roles = areWeQA(env.roles)
-            for r in roles:
-                execute('fabops.andyet.%s' % r, r, qa=isQA)
-
-@task
-def deploy_apps(appname=None):
+def install_blog():
     if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
         if env.host_string in env.apps:
-            if appname is not None:
+            appname = "andyet-blog"
+            appConfig = getAppConfig(appName)
+
+            if isinstance(appConfig, dict) and 'name' in appConfig:
                 if appname in env.apps[env.host_string]:
-                    fabops.provision.app_deploy(appname)
+                    fabops.common.install_package('mhddfs')
+
+                    with settings(user=appConfig['deploy_user']):
+                        with cd(appConfig['home_dir']):
+                            run('wget -O - "https://www.dropbox.com/download?plat=lnx.x86_64" | tar xzf -')
+
+                    put('templates/dropbox_blog.initd', '/etc/init.d/dropbox_blog', use_sudo=True)
+                    sudo('chmod +x /etc/init.d/dropbox_blog')
+                    sudo('update-rc.d dropbox_blog defaults')
+                    sudo('/etc/init.d/dropbox_blog')
+
+                    print("*"*42)
+                    print("you need to register the server with dropbox using the link that the service is now spamming")
+                    print("you will also need to chmod +r the Dropbox folder so nginx can see it")
+                    print("*"*42)
+
+def getProjectConfig(projectName, hostName, itemName=None):
+    if itemName is None:
+        itemName = projectName
+    projectCfgDir = os.path.join(os.path.abspath(env.projectDir), itemName)
+    projectCfgFile = os.path.join(projectCfgDir, '%s.cfg' % itemName)
+    projectConfig  = {}
+
+    if os.path.exists(projectCfgFile):
+        try:
+            projectConfig               = json.load(open(projectCfgFile, 'r'))
+
+            projectConfig['name']       = itemName
+            projectConfig['configDir']  = projectCfgDir
+            projectConfig['configFile'] = projectCfgFile
+            projectConfig['homeDir']    = '/home/%s' % projectConfig['deploy_user']
+            projectConfig['logDir']     = '/var/log/%s' % itemName
+
+            if 'app_dir' in projectConfig:
+                projectConfig['appDir'] = '/home/%s/%s' % (projectConfig['deploy_user'], projectConfig['app_dir'])
             else:
-                for app in env.apps[env.host_string]:
-                    fabops.provision.app_deploy(app)
+                projectConfig['appDir'] = '/home/%s/%s' % (projectConfig['deploy_user'], itemName)
+
+            if projectName in env.projects and 'qa' in env.projects[projectName]:
+                projectConfig['qa'] = env.projects[projectName]['qa']
+
+            defaultConfig = fabops.common.flatten(env.defaults)
+            projectConfig = fabops.common.flatten(projectConfig)
+
+            for k in defaultConfig:
+                if k not in projectConfig:
+                    projectConfig[k] = defaultConfig[k]
+
+            if hostName in env.overrides:
+                for k in env.overrides[hostName]:
+                    projectConfig[k] = env.overrides[hostName][k]
+
+            if projectConfig['qa']:
+                s = 'qa'
+            else:
+                s = 'prod'
+            dnsConfig = fabops.common.flatten(env.dns[s])
+
+            for k in dnsConfig:
+                projectConfig['dns.%s' % k] = dnsConfig[k]
+
+        except:
+            print('error parsing configuration file %s' % projectCfgFile)
+            print(sys.exc_info())
+            projectConfig = {}
+
+    return projectConfig
+
+def loadProject(projectName):
+    if projectName in env.projects:
+        project = env.projects[projectName]
+
+        if env.host_string is None:
+            env.hosts.extend(project['hosts'])
+            env.host_string = project['hosts'][0]
+
+        return getProjectConfig(projectName, env.host_string)
     else:
-        print("deploy_apps called for a host that is not bootstrapped")
+        return None
 
 @task
-def deploy_sites(sitename=None):
-    if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
-        roles = []
-        isQA  = False
+def deployProject(projectName):
+    if projectName in env.projects:
+        project = env.projects[projectName]
 
-        if env.host_string in env.sites:
-            if sitename is not None:
-                if sitename in env.sites[env.host_string]:
-                    fabops.provision.site_deploy(sitename)
-            else:
-                for site in env.sites[env.host_string]:
-                    fabops.provision.site_deploy(site)
+        if env.host_string is None:
+            env.hosts.extend(project['hosts'])
+            env.host_string = project['hosts'][0]
+
+        execute('fabops.andyet.deploy', projectName)
 
 @task
-def redis_web(rolename, qa=False):
-    print('redis_web: role=%s qa=%s' % (rolename, qa))
-    fabops.redis.deploy(rolename, qa)
+def deploy(projectName):
+    if projectName not in env.projects:
+        print('%s not found in list of known projects')
+    else:
+        if not exists('/etc/andyet_ops_bootstrap'):
+            print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
+        else:
+            if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+                project       = env.projects[projectName]
+                projectConfig = getProjectConfig(projectName, env.host_string)
+
+                if 'tasks' in project:
+                    for task in project['tasks']:
+                        execute('fabops.andyet.deploy_task', projectName, task)
+
+                if 'haproxy.acls' in projectConfig:
+                    execute('fabops.haproxy.install_site', projectName, projectConfig)
+
+                if 'deploy_user' in projectConfig:
+                    if not fabops.common.user_exists(projectConfig['deploy_user']):
+                        fabops.users.adduser(projectConfig['deploy_user'], 'ops.keys')
+
+                    if 'deploy_key' in projectConfig:
+                        if fabops.common.user_exists(projectConfig['deploy_user']):
+                            fabops.users.adddeploykey(projectConfig['deploy_user'], 
+                                                      os.path.join(env.our_path, 'keys', projectConfig['deploy_key']), 
+                                                      projectConfig['deploy_key'])
+                        if 'repo_keys' in projectConfig:
+                            for repoKey in projectConfig['repo_keys']:
+                                fabops.users.adddeploykey(projectConfig['deploy_user'], 
+                                                          os.path.join(env.our_path, 'keys', repoKey), 
+                                                          repoKey)
+                        if 'repository_site.key' in projectConfig:
+                            fabops.users.adddeploykey(projectConfig['deploy_user'], 
+                                                      os.path.join(env.our_path, 'keys', projectConfig['repository_site.key']), 
+                                                      projectConfig['repository_site.key'])
+
+                    if 'nginx.sitename' in projectConfig:
+                        execute('fabops.nginx.deploy', projectConfig)
+                    if 'monit.type' in projectConfig:
+                        execute('fabops.provision.add_app_to_monit', projectConfig, projectName)
+                    if 'upstart.type' in projectConfig:
+                        execute('fabops.provision.add_app_to_upstart', projectConfig, projectName)
+                        if projectConfig['upstart.type'] == 'node':
+                            execute('fabops.nodejs.deploy', projectConfig)
+                    if 'runit.type' in projectConfig:
+                        execute('fabops.runit.update_app', projectConfig)
+                        if projectConfig['runit.type'] == 'node':
+                            execute('fabops.nodejs.deploy', projectConfig)
 
 @task
-def redis_api(rolename, qa=False):
-    print('redis_api: role=%s qa=%s' % (rolename, qa))
-    fabops.redis.deploy(rolename, qa)
+def deploy_task(projectName, taskName):
+    if not exists('/etc/andyet_ops_bootstrap'):
+        print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
+    else:
+        if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+            if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
+                projectConfig = getProjectConfig(projectName, env.host_string)
+                if taskName in ('nginx', 'redisWeb', 'redisApi', 'errorTests'):
+                    execute('fabops.andyet.%s' % taskName, taskName, projectConfig)
 
 @task
-def riak(rolename, qa=False):
-    print('riak: qa=%s' % qa)
-    fabops.riak.deploy(qa)
+def update_app(projectName, appName):
+    if not exists('/etc/andyet_ops_bootstrap'):
+        print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
+    else:
+        if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+            if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
+                projectConfig = getProjectConfig(projectName, env.host_string)
+                project       = env.projects[projectName]
+
+                if 'apps' in project and appName in project['apps']:
+                    execute('fabops.nodejs.deploy', projectName, projectConfig, force=False)
 
 @task
-def prod(rolename, qa=False):
-    print "prod", rolename, qa
+def opsbot_status(projectName):
+    if not exists('/etc/andyet_ops_bootstrap'):
+        print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
+    else:
+        if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+            if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
+                projectConfig = getProjectConfig(projectName, env.host_string)
+                project       = env.projects[projectName]
+                if 'apps' in project and itemName in project['apps']:
+                    with settings(user=projectConfig['deploy_user'], use_sudo=True):
+                        if exists(projectConfig['deploy_dir']):
+                            with cd(projectConfig['deploy_dir']):
+                                run('git status')
+                        else:
+                            print('project is not deployed')
 
 @task
-def andbang_web(rolename, qa=False):
-    print "andbang_web", rolename, qa
+def opsbot_deploy(projectName):
+    if not exists('/etc/andyet_ops_bootstrap'):
+        print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
+    else:
+        if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+            if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
+                deployProject(projectName)
 
 @task
-def haproxy(rolename, qa=False):
-    fabops.haproxy.install()
+def opsbot_service(projectName, state):
+    if not exists('/etc/andyet_ops_bootstrap'):
+        print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
+    else:
+        if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+            if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
+                projectConfig = getProjectConfig(projectName, env.host_string)
+                project       = env.projects[projectName]
+
+                if 'upstart.type' in projectConfig:
+                    sudo('service %s %s' % (projectName, state))
+                else:
+                    sudo('sv %s %s' % (state, projectName))
+
+@task
+def opsbot_start(projectName):
+    execute('fabops.andyet.opsbot_service', projectName, 'start')
+
+@task
+def opsbot_stop(projectName):
+    execute('fabops.andyet.opsbot_service', projectName, 'stop')
+
+@task
+def enable_runit(projectName):
+    projectConfig = loadProject(projectName)
+    execute('fabops.runit.enable_app', projectConfig)
+
+@task
+def disable_runit(projectName):
+    projectConfig = loadProject(projectName)
+    execute('fabops.runit.disable_app', projectConfig)
+
+@task
+def errorTests(taskName, projectConfig):
+    if not exists('/srv/andyet_errors'):
+        sudo('mkdir -p /srv/andyet_errors/500')
+    upload_template('templates/andyet_error.html', '/srv/andyet_errors/500/andyet_error.html',
+                    context=projectConfig, use_sudo=True)
+    sudo('chown -R root:root /srv/andyet_errors')
+
+
+@task
+def nginx(taskName, projectConfig):
+    execute('fabops.nginx.install')
+
+@task
+def redisWeb(taskName, projectConfig):
+    fabops.redis.deploy(taskName, projectConfig)
+
+@task
+def redisApi(taskName, projectConfig):
+    fabops.redis.deploy(taskName, projectConfig)
+
+@task
+def riak(taskName, projectConfig):
+    fabops.riak.deploy(taskName, projectConfig)

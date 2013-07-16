@@ -1,0 +1,34 @@
+{
+    "isDev": false,
+    "andyet": {
+        "appsUrl": "%(andyet.apps)s"
+    },
+    "http": {
+        "baseUrl": "%(nginx.url)s",
+        "port": %(haproxy.api.port)s
+    },
+    "redis": {
+        "talkyApi": {
+            "host": "%(dns.redis_api.ip)s",
+            "port": %(dns.redis_api.port)s
+        },
+        "apps": {
+            "host": "%(dns.redis_api.ip)s",
+            "port": %(dns.redis_api.port)s
+        }
+    },
+    "bucker": {
+        "app": {
+            "filename": "/var/log/%(name)s/api-app.log",
+            "format": ":time :level :data",
+            "timestamp": "YYYY-MM-DDTHH:mm:ss"
+        },
+        "access": {
+            "filename": "/var/log/%(name)s/api-access.log",
+            "format": ":time :level :data",
+            "timestamp": "YYYY-MM-DDTHH:mm:ss"
+        },
+        "console": false,
+        "level": "debug"
+    }
+}

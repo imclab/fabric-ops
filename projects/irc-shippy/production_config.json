@@ -1,0 +1,50 @@
+{
+    "isDev": false,
+    "irc": {
+        "version": "1.0",
+        "created": "2013-04-04",
+        "host": "%(irc.host)s",
+        "port": 6697,
+        "cert": "/etc/haproxy/ssl-keys/%(haproxy.pemfile)s",
+        "key": "/etc/haproxy/ssl-keys/%(haproxy.keyfile)s",
+        "systemUser": "shippy",
+        "name": "Shippy"
+    },
+    "http": {
+        "listen": " %(dns.irc-shippy.ip)s",
+        "port": %(dns.irc-shippy.port)s
+    },
+    "session": {
+        "host": "localhost",
+        "port": 6380,
+        "db": 1,
+        "secret": "bang!",
+        "secure": true
+    },
+    "redis": {
+        "host": "localhost",
+        "port": 6380
+    },
+    "andyetAuth": {
+        "id": "%(andyet.id)s",
+        "secret": "%(andyet.secret)s"
+    },
+    "andyetAPIs": {
+        "shippy": "%(andyet.apiUrl)s",
+        "apps": "%(andyet.appSiteUrl)s"
+    },
+    "bucker": {
+        "app": {
+            "filename": "/var/log/irc-shippy/irc-app.log",
+            "format": ":time :level :data",
+            "timestamp": "YYYY-MM-DDTHH:mm:ss"
+        },
+        "access": {
+            "filename": "/var/log/irc-shippy/irc-access.log",
+            "format": ":time :level :data",
+            "timestamp": "YYYY-MM-DDTHH:mm:ss"
+        },
+        "console": false,
+        "level": "debug"
+    }
+}

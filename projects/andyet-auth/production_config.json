@@ -1,0 +1,66 @@
+{
+    "baseUrl": "%(base_url)s",
+    "accountsAppUrl": "https://apps.andyet.com",
+    "mainAppUrl": "https://shippy.io",
+    "docsAppUrl": "https://developer.shippy.io",
+    "origins": "*:*",
+    "postageAppKey": "88xZVnHaSU0CoZgw0HXA1uq7jop8xK6X",
+    "oauth": {
+        "loginURL": "https://apps.andyet.com/login",
+        "encryptionSecret": "encryption secret",
+        "signingSecret": "signing secret",
+        "tokenTTL": 9999999999
+    },
+    "chargify": {
+        "subDomain": "shippy.io",
+        "productHandle": "base",
+        "normalComponent": 6551
+    },
+    "braintree": {
+        "environment": "Sandbox",
+        "merchantId": "ymdpdc7sjmmqsfwb",
+        "publicKey": "kb2mkn239hc6jfcz",
+        "privateKey": "1eaed87ef60ab632ab87eae390d59078",
+        "clientKey": "MIIBCgKCAQEAuiLmcLpU/kDwj97/allQ/Hv+HPYgt7/QiGQGV6BiQfl8PYqeAXD1hw5FGLS+XqUxYiDLp9HpbJB1H7RTndasHnkM9XAkrtFus4HYiqhJtNxGfouRiCmNSrAFMPYoMc11haYrRwqycUm+LqwH0Hxsz9Z7uT5p9UWp88p1OE5ueDKRyzZkWVbcn+9bmojIYHCTRoQJA+0I1ag04EyrqBvjETjb/kG0GtU53ReKIHhTVkIsvZUWobhaaKyTkvqa2p4Z4oYVNfnROTYivi5XksVwbTGKJQjCrCs/bSQljuQyoYVEmD2N91hi6C70XTpR/GyYahb3JZZsKbxwvm5yfUe7xQIDAQAB"
+    },
+    "http": {
+        "listen": "127.0.0.1",
+        "port": %(dns.apps-andyet.port)s,
+        "cert": "ssl-keys/star_andyet_com.crt",
+        "ca": "ssl-keys/gd_bundle.crt",
+        "key": "ssl-keys/star_andyet_com.key"
+    },
+    "session": {
+        "secret": "daBang",
+        "secure": true
+    },
+    "redis": {
+        "thoonk": {
+            "host": "%(dns.redis_api.ip)s",
+            "port": %(dns.redis_api.port)s,
+            "db": 0
+        },
+        "connect": {
+            "host": "%(dns.redis_api.ip)s",
+            "port": %(dns.redis_api.port)s,
+            "db": 0
+        }
+    },
+    "bucker": {
+        "app": {
+            "filename": "/var/log/%(name)s/auth-app.log",
+            "format": ":time :level :data",
+            "timestamp": "YYYY-MM-DDTHH:mm:ss"
+        },
+        "access": {
+            "filename": "/var/log/%(name)s/auth-access.log",
+            "format": ":time :level :data",
+            "timestamp": "YYYY-MM-DDTHH:mm:ss"
+        },
+        "console": false,
+        "level": "debug"
+    },
+    "kissFileName": "kiss_dev.js",
+    "replSock": "/tmp/%(name)s.sock",
+    "appFixtures": "/home/andyet-auth/apps.js"
+}

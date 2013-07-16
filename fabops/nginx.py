@@ -12,7 +12,7 @@ from fabric.context_managers import cd
 
 import fabops.common
 
-_version   = '1.4.0'
+_version   = '1.5.1'
 _tarball   = 'nginx-%s.tar.gz' % _version
 _url       = 'http://nginx.org/download/%s' % _tarball
 _tmp_dir   = '/tmp/nginx-%s' % _version
@@ -69,71 +69,86 @@ def install(force=False):
                 sudo('ln -s /usr/local/nginx/sbin/nginx /usr/local/sbin/nginx')
         put('templates/nginx/nginx_initd_script', '/etc/init.d/nginx', use_sudo=True)
         sudo('chmod +x /etc/init.d/nginx')
+        sudo('update-rc.d nginx defaults')
 
     upload_template('templates/nginx/nginx.conf', '/etc/nginx/nginx.conf', 
-                    context=env.nginx,
+                    context=env.defaults['nginx'],
                     use_sudo=True)
     sudo('chown root:root /etc/nginx/nginx.conf')
 
     if not exists('/var/log/nginx'):
         sudo('mkdir /var/log/nginx')
 
-    for p in ['ops-common', 'conf.d']:
+    for p in ['ops-common', 'conf.d', 'ssl-keys']:
         if not exists('/etc/nginx/%s' % p):
             sudo('mkdir /etc/nginx/%s' % p)
 
     for f in fabops.common.list_files('templates/nginx/ops-common'):
         upload_template(os.path.join('templates/nginx/ops-common', f), '/etc/nginx/ops-common',
-                        context=env.nginx,
+                        context=env.defaults['nginx'],
                         use_sudo=True)
         sudo('chown root:root /etc/nginx/ops-common/%s' % f)
 
 @task
-def install_site(siteName, siteConfig):
-    if not exists('/etc/nginx'):
+def deploy(projectConfig):
+    """
+    Deploy a project's website configuration with nginx
+
+    assumes deploy user is already enabled
+    """
+    if not fabops.common.user_exists(_username):
         install()
 
-    if exists('/etc/nginx'):
-        cfg = fabops.common.flatten(siteConfig)
+    nginxConfig = '/etc/nginx/conf.d/%s.conf' % projectConfig['name']
 
-        if 'nginx.root' not in cfg:
-            print('nginx.root not found in site configuration')
+    upload_template(os.path.join(projectConfig['configDir'], '%s.nginx' % projectConfig['name']),
+                    nginxConfig,
+                    context=projectConfig,
+                    use_sudo=True)
+    sudo('chown root:root %s' % nginxConfig)
 
-        upload_template(os.path.join(siteConfig['site_config_dir'], '%s.nginx' % cfg['name']),
-                        '/etc/nginx/conf.d/%s.conf' % cfg['name'],
-                        context=cfg,
-                        use_sudo=True)
-        sudo('chown root:root /etc/nginx/conf.d/%s.conf' % cfg['name'])
-        if not exists(cfg['nginx.root']):
-            sudo('mkdir -p %s' % cfg['nginx.root'])
-            sudo('chown nginx:nginx %s' % cfg['nginx.root'])
+    if 'nginx.ssl_cert' in projectConfig:
+        put(os.path.join(env.our_path, 'keys', projectConfig['nginx.ssl_cert']), 
+            '/etc/nginx/ssl-keys/%s' % projectConfig['nginx.ssl_cert'], use_sudo=True)
+    if 'nginx.ssl_cert_key' in projectConfig:
+        put(os.path.join(env.our_path, 'keys', projectConfig['nginx.ssl_cert_key']), 
+            '/etc/nginx/ssl-keys/%s' % projectConfig['nginx.ssl_cert_key'], use_sudo=True)
 
-@task
-def deploy_site(siteConfig):
-    """
-    Deploy an installed nginx site
-    """
-    if 'repository' in siteConfig:
-        if fabops.common.user_exists(siteConfig['deploy_user']):
-            updateFiles = False
-            tempDir     = '/tmp/%s' % siteConfig['name']
-            workDir     = os.path.join(tempDir, siteConfig['name'])
+    if 'repository_site.type' in projectConfig:
+        repoUrl      = projectConfig['repository_site.url']
+        tempDir      = os.path.join('/home', projectConfig['deploy_user'], 'work')
+        workDir      = os.path.join(tempDir, projectConfig['name'])
+        if 'repository_site.alias' in projectConfig:
+            targetDir = os.path.join('/home', projectConfig['deploy_user'], projectConfig['repository_site.alias'])
+        else:
+            targetDir = os.path.join('/home', projectConfig['deploy_user'], projectConfig['name'])
+        if 'repository_site.key' in projectConfig:
+            siteKey = projectConfig['repository_site.key']
+        else:
+            siteKey = projectConfig['deploy_key']
+        if 'repository_site.branch' in projectConfig:
+            deployBranch = projectConfig['repository_site.branch']
+        else:
+            deployBranch = projectConfig['deploy_branch']
 
-            if exists(tempDir):
-                sudo('rm -rf %s' % tempDir)
+        if exists(tempDir):
+            sudo('rm -rf %s' % tempDir)
 
-            with settings(user=siteConfig['deploy_user'], use_sudo=True):
-                run('ssh-add %s' % '.ssh/%s' % siteConfig['deploy_key'])
-                run('mkdir -p %s' % workDir)
-                run('git clone %s %s' % (siteConfig['repository']['url'], workDir))
+        with settings(user=projectConfig['deploy_user']):
+            run('mkdir -p %s' % targetDir)
+            run('mkdir -p %s' % workDir)
 
-                with cd(workDir):
-                    updateFiles = run('git checkout %s' % siteConfig['deploy_branch'])
+            run('ssh-add -D; ssh-add .ssh/%s' % siteKey)
+            run('git clone %s %s' % (repoUrl, workDir))
 
-            if updateFiles:
-                sudo('cp %s/* %s' % (workDir, siteConfig['nginx']['root']))
+            with cd(workDir):
+                if run('git checkout %s' % deployBranch):
+                    run('cp -r %s/* %s' % (workDir, targetDir))
 
-            if sudo('service nginx testconfig'):
-                sudo('service nginx restart')
+            upload_template('templates/project_deploy.sh', 'deploy.sh', context=projectConfig)
+            run('chmod +x %s' % os.path.join(projectConfig['homeDir'], 'deploy.sh'))
     else:
-        print('site does not have a defined repository, skipping')
+        print('site does not have a defined site repository, skipping')
+
+    if sudo('service nginx testconfig'):
+        sudo('service nginx restart')

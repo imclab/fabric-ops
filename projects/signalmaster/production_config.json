@@ -1,0 +1,6 @@
+{
+    "isDev": true,
+    "server": {
+        "port": %(dns.signalmaster.port)s
+    }
+}

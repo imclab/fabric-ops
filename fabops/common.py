@@ -99,36 +99,17 @@ def config(cfgFilename='fabric.cfg'):
     filename = os.path.join(_ourPath, cfgFilename)
     cfg      = json.load(open(filename, 'r'))
 
-    setattr(env, 'our_path', _ourPath)
-    setattr(env, 'sites',    {})
-    setattr(env, 'apps',     {})
+    setattr(env, 'our_path',  _ourPath)
+    setattr(env, 'projects',  {})
+    setattr(env, 'defaults',  {})
+    setattr(env, 'dns',       {})
+    setattr(env, 'overrides', {})
 
     for opt in cfg.keys():
-        if opt in ('user', 'key_filename', 'hosts', 'nginx', 'haproxy', 'redis', 'riak', 'app_dir', 'site_dir', 'pinned'):
+        if opt in ('user', 'key_filename', 'hosts', 'projects', 'overrides', 'defaults', 'dns', 'projectDir', 'pinned'):
 
-            if opt == 'hosts':
-                # "hosts": [ { "host": "data2",
-                #              "role": ["app"]
-                #            }
-                #          ]
-                for h in cfg[opt]:
-                    hostname = h['host']
-                    roles    = h['role']
-                    for r in roles:
-                        if r not in env.roledefs:
-                            env.roledefs[r] = []
-                        env.roledefs[r].append(hostname)
-                    if 'apps' in h:
-                        apps = h['apps']
-                        for app in apps:
-                            if hostname not in env.apps:
-                                env.apps[hostname] = []
-                            env.apps[hostname].append(app)
-                    if 'sites' in h:
-                        sites = h['sites']
-                        for site in sites:
-                            if hostname not in env.sites:
-                                env.sites[hostname] = []
-                            env.sites[hostname].append(site)
+            if opt == 'projects':
+                for h in cfg[opt].keys():
+                    env.projects[h] = cfg[opt][h]
             else:
                 setattr(env, opt, cfg[opt])

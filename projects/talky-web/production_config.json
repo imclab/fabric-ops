@@ -1,0 +1,35 @@
+{
+    "isDev": false,
+    "andyetAuth": {
+        "id": "%(andyet.id)s",
+        "secret": "%(andyet.secret)s"
+    },
+    "andyetAPIs": {
+        "talky": "%(andyet.apiUrl)s",
+        "apps": "%(andyet.appSiteUrl)s"
+    },
+    "http": {
+        "baseUrl": "%(nginx.url)s",
+        "port": %(nginx.proxy_port)s
+    },
+    "session": {
+        "secret": "shhhhhh don't tell anyone ok?",
+        "host": "127.0.0.1",
+        "port": 6380,
+        "secure": true
+    },
+    "bucker": {
+        "app": { "filename": "/var/log/%(name)s/web-app.log" },
+        "access": { "filename": "/var/log/%(name)s/web-access.log" },
+        "console": false,
+        "level": "debug"
+    },
+    "clientSettings": {
+        "disableMetrics": false,
+        "apiUrl": "%(andyet.apiUrl)s",
+        "appSiteUrl": "%(andyet.appSiteUrl)s",
+        "signupUrl": "%(andyet.signupUrl)s",
+        "screenShareTimeout": "1:00",
+        "supportEmail": "1qnjz20f@incoming.intercom.io"
+    }
+}

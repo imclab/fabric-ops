@@ -41,18 +41,13 @@ def build():
             run('make')
 
 @task
-def install(force=False, qa=False):
+def install(cfg, force=False):
     """
     Install redis
     Download, extract, configure and install redis if the redis
     user does not already exist.
 
     Force install by calling as redis.install:true
-
-    qa should be set to True when provisioning a non-production
-       server, it controls what data volume is used
-         False == /data/redis
-         True  == /var/lib/redis
     """
     if not force and fabops.common.user_exists(_username):
         print('redis user already exists, skipping redis install')
@@ -76,31 +71,34 @@ def install(force=False, qa=False):
     if not exists('/etc/redis'):
         sudo('mkdir /etc/redis')
 
-    if qa:
-        datadir = '/var/lib/redis'
-    else:
-        datadir = env.redis['datadir']
-
-    for d in (env.redis['logdir'], env.redis['piddir'], datadir):
+    for d in (cfg['logdir'], cfg['piddir'], cfg['dataroot']):
         if not exists(d):
             sudo('mkdir %s' % d)
         sudo('chown %s:%s %s' % (_username, _username, d))
 
 @task
-def deploy(rolename, qa=False):
-    if rolename in env.redis['ports']:
-        install(qa=qa)
-
-        if qa:
+def deploy(nodeName, projectConfig):
+    redisNode = 'redis.ports.%s' % nodeName
+    if redisNode in projectConfig:
+        if projectConfig['qa']:
             dataroot = '/var/lib/redis'
         else:
-            dataroot = env.redis['datadir']
+            dataroot = projectConfig['redis.datadir']
 
-        d            = env.redis
-        d['port']    = env.redis['ports'][rolename]
-        s            = 'redis_%s' % d['port']
-        datadir      = os.path.join(dataroot, s)
-        d['datadir'] = datadir
+        s             = 'redis_%s' % projectConfig[redisNode]
+        d             = {}
+        d['user']     = projectConfig['redis.user']
+        d['ip']       = projectConfig['redis.ip']
+        d['port']     = projectConfig[redisNode]
+        d['dataroot'] = dataroot
+        d['datadir']  = os.path.join(dataroot, s)
+        d['piddir']   = projectConfig['redis.piddir']
+        d['logdir']   = projectConfig['redis.logdir']
+
+        install(d)
+
+        sudo('mkdir -p %s' % d['datadir'])
+        sudo('chown %s:%s %s' % (_username, _username, d['datadir']))
 
         upload_template('templates/redis/redis.conf', '/etc/redis/%s.cfg' % s, 
                         context=d,
@@ -112,6 +110,6 @@ def deploy(rolename, qa=False):
                         use_sudo=True)
 
         if exists('/etc/monit/conf.d'):
-            upload_template('templates/monit/redis.conf', '/etc/monit/conf.d/redis_%s.conf' % d['port'],
+            upload_template('templates/monit/redis.conf', '/etc/monit/conf.d/%s.conf' % s,
                             context=d,
                             use_sudo=True)

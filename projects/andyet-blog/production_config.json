@@ -1,0 +1,6 @@
+{
+  "baseUrl": "https://blog.andyet.com",
+  "http": {
+    "port": %(nginx.proxy_port)s
+  }
+}

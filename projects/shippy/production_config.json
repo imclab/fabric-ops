@@ -1,0 +1,29 @@
+{
+    "isDev": false,
+    "baseUrl": "%(nginx.url)s",
+    "session": {
+        "host": "localhost",
+        "port": 6380,
+        "db": 0,
+        "secret": "bang!",
+        "secure": true
+    },
+    "http": {
+        "listen": "127.0.0.1",
+        "port": %(nginx.proxy_port)s
+    },
+    "andyetAuth": {
+        "id": "%(andyet.id)s",
+        "secret": "%(andyet.secret)s"
+    },
+    "andyetAPIs": {
+        "shippy": "%(andyet.apiUrl)s",
+        "apps": "%(andyet.appSiteUrl)s"
+    },
+    "bucker": {
+        "app": "/var/log/%(name)s/shippy-app.log",
+        "access": "/var/log/%(name)s/shippy-access.log",
+        "console": false,
+        "level": "debug"
+    }
+}

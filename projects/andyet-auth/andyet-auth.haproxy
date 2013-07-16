@@ -1,0 +1,8 @@
+
+backend acct
+    balance roundrobin
+    server  andyet_acct %(haproxy.acct.ip)s:%(haproxy.acct.port)s weight 1 maxconn 2500 check
+
+backend ws
+    balance roundrobin
+    server  andyet_acct %(haproxy.ws.ip)s:%(haproxy.ws.port)s weight 1 maxconn 2500 check
