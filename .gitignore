@@ -2,6 +2,10 @@
 *.cfg
 *.keys
 
+keys
+
+*.backup
+
 # Packages
 *.egg
 *.egg-info
