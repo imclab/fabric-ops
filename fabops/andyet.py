@@ -18,6 +18,16 @@ import fabops.redis
 
 
 @task
+def install_opsbot():
+    if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+        if not fabops.common.user_exists('opsbot'):
+            fabops.users.adduser('opsbot', 'ops.keys')
+
+        sudo('pip install fabric')
+
+        execute('fabops.nodejs.install_Node', 'opsbot', 'v0.10.12', '/home/opsbot/')
+
+@task
 def install_blog():
     if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
         if env.host_string in env.apps:
@@ -94,28 +104,62 @@ def getProjectConfig(projectName, hostName, itemName=None):
 
     return projectConfig
 
-def loadProject(projectName):
-    if projectName in env.projects:
+def checkHost(projectName, prod):
+    if env.host_string is None:
+        hosts   = []
         project = env.projects[projectName]
 
-        if env.host_string is None:
-            env.hosts.extend(project['hosts'])
-            env.host_string = project['hosts'][0]
+        if prod:
+            hosts = project['hosts']
+        else:
+            for host in project['hosts']:
+                projectConfig = getProjectConfig(projectName, host)
+                if projectConfig['qa']:
+                    hosts.append(host)
+        env.host_string = hosts[0]
+        env.hosts.extend(hosts)
+
+def loadProject(projectName, prod):
+    if projectName in env.projects:
+        checkHost(projectName, prod)
 
         return getProjectConfig(projectName, env.host_string)
     else:
         return None
 
 @task
-def deployProject(projectName):
+def deployProject(projectName, prod=False):
     if projectName in env.projects:
-        project = env.projects[projectName]
-
-        if env.host_string is None:
-            env.hosts.extend(project['hosts'])
-            env.host_string = project['hosts'][0]
+        checkHost(projectName, prod)
 
         execute('fabops.andyet.deploy', projectName)
+
+@task
+def updateProject(projectName, prod=False):
+    checkHost(projectName, prod)
+
+    if projectName not in env.projects:
+        print('%s not found in list of known projects')
+    else:
+        if not exists('/etc/andyet_ops_bootstrap'):
+            print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
+        else:
+            if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+                project       = env.projects[projectName]
+                projectConfig = getProjectConfig(projectName, env.host_string)
+
+                if 'nginx.sitename' in projectConfig:
+                    execute('fabops.nginx.deploy', projectConfig)
+                if 'monit.type' in projectConfig:
+                    execute('fabops.provision.add_app_to_monit', projectConfig, projectName)
+                if 'upstart.type' in projectConfig:
+                    execute('fabops.provision.add_app_to_upstart', projectConfig, projectName)
+                    if projectConfig['upstart.type'] == 'node':
+                        execute('fabops.nodejs.deploy', projectConfig)
+                if 'runit.type' in projectConfig:
+                    execute('fabops.runit.update_app', projectConfig)
+                    if projectConfig['runit.type'] == 'node':
+                        execute('fabops.nodejs.deploy', projectConfig)
 
 @task
 def deploy(projectName):
@@ -155,18 +199,7 @@ def deploy(projectName):
                                                       os.path.join(env.our_path, 'keys', projectConfig['repository_site.key']), 
                                                       projectConfig['repository_site.key'])
 
-                    if 'nginx.sitename' in projectConfig:
-                        execute('fabops.nginx.deploy', projectConfig)
-                    if 'monit.type' in projectConfig:
-                        execute('fabops.provision.add_app_to_monit', projectConfig, projectName)
-                    if 'upstart.type' in projectConfig:
-                        execute('fabops.provision.add_app_to_upstart', projectConfig, projectName)
-                        if projectConfig['upstart.type'] == 'node':
-                            execute('fabops.nodejs.deploy', projectConfig)
-                    if 'runit.type' in projectConfig:
-                        execute('fabops.runit.update_app', projectConfig)
-                        if projectConfig['runit.type'] == 'node':
-                            execute('fabops.nodejs.deploy', projectConfig)
+                        update_project(projectName, projectConfig)
 
 @task
 def deploy_task(projectName, taskName):
@@ -193,15 +226,18 @@ def update_app(projectName, appName):
                     execute('fabops.nodejs.deploy', projectName, projectConfig, force=False)
 
 @task
-def opsbot_status(projectName):
+def opsbot_status(projectName, prod):
     if not exists('/etc/andyet_ops_bootstrap'):
         print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
     else:
         if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+            checkHost(projectName, prod)
+
             if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
                 projectConfig = getProjectConfig(projectName, env.host_string)
                 project       = env.projects[projectName]
-                if 'apps' in project and itemName in project['apps']:
+
+                if 'upstart.type' in projectConfig or 'runit.type' in projectConfig:
                     with settings(user=projectConfig['deploy_user'], use_sudo=True):
                         if exists(projectConfig['deploy_dir']):
                             with cd(projectConfig['deploy_dir']):
@@ -210,20 +246,20 @@ def opsbot_status(projectName):
                             print('project is not deployed')
 
 @task
-def opsbot_deploy(projectName):
+def opsbot_deploy(projectName, prod):
     if not exists('/etc/andyet_ops_bootstrap'):
         print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
     else:
-        if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
-            if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
-                deployProject(projectName)
+        updateProject(projectName, prod)
 
 @task
-def opsbot_service(projectName, state):
+def opsbot_service(projectName, prod, state):
     if not exists('/etc/andyet_ops_bootstrap'):
         print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
     else:
         if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+            checkHost(projectName, prod)
+
             if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
                 projectConfig = getProjectConfig(projectName, env.host_string)
                 project       = env.projects[projectName]
@@ -234,12 +270,12 @@ def opsbot_service(projectName, state):
                     sudo('sv %s %s' % (state, projectName))
 
 @task
-def opsbot_start(projectName):
-    execute('fabops.andyet.opsbot_service', projectName, 'start')
+def opsbot_start(projectName, prod):
+    execute('fabops.andyet.opsbot_service', projectName, prod, 'start')
 
 @task
-def opsbot_stop(projectName):
-    execute('fabops.andyet.opsbot_service', projectName, 'stop')
+def opsbot_stop(projectName, prod):
+    execute('fabops.andyet.opsbot_service', projectName, prod, 'stop')
 
 @task
 def enable_runit(projectName):
@@ -258,7 +294,6 @@ def errorTests(taskName, projectConfig):
     upload_template('templates/andyet_error.html', '/srv/andyet_errors/500/andyet_error.html',
                     context=projectConfig, use_sudo=True)
     sudo('chown -R root:root /srv/andyet_errors')
-
 
 @task
 def nginx(taskName, projectConfig):

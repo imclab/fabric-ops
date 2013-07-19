@@ -18,6 +18,7 @@ import fabops.nginx
 
 _node_version = 'v0.8.18'
 _nvm_url      = 'https://github.com/creationix/nvm.git'
+_npm_params   = '--production --color=false --loglevel error'
 
 @task
 def install_Node(user, nodeVersion, installDir):
@@ -52,9 +53,11 @@ def deploy(projectConfig, force=True):
         repoKey = None
         if 'repo_keys' in projectConfig:
             repoKey = projectConfig['repo_keys'][0]
+            projectConfig['siteKey'] = repoKey
             projectConfig['repoKey'] = repoKey
         else:
             projectConfig['repoKey'] = ''
+            projectConfig['siteKey'] = ''
             # for repoKey in projectConfig['repo_keys']:
             #     run('ssh-add .ssh/%s' % repoKey)
 
@@ -86,7 +89,7 @@ def deploy(projectConfig, force=True):
 
                 if repoKey is not None:
                     run('ssh-add -D; ssh-add ~/.ssh/%s' % repoKey)
-                run('. %s/.nvm/nvm.sh; npm install --production --color=false' % projectConfig['homeDir'])
+                run('. %s/.nvm/nvm.sh; npm install %s' % (projectConfig['homeDir'], _npm_params))
 
         upload_template('templates/project_deploy.sh', 'deploy.sh', context=projectConfig)
         run('chmod +x %s' % os.path.join(projectConfig['homeDir'], 'deploy.sh'))

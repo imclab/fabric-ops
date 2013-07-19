@@ -22,6 +22,11 @@
                 deny all;
                 return 404;
         }
+        location /500 {
+            root /srv/andyet_errors;
+            index andyet_error.html;
+            try_files $uri $uri/ =404;
+        }
         location / {
             try_files $uri @talky;
         }

@@ -124,8 +124,11 @@ def deploy(projectConfig):
             targetDir = os.path.join('/home', projectConfig['deploy_user'], projectConfig['name'])
         if 'repository_site.key' in projectConfig:
             siteKey = projectConfig['repository_site.key']
+            projectConfig['siteKey'] = siteKey
         else:
             siteKey = projectConfig['deploy_key']
+            projectConfig['siteKey'] = ''
+
         if 'repository_site.branch' in projectConfig:
             deployBranch = projectConfig['repository_site.branch']
         else:
