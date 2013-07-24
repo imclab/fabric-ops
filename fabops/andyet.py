@@ -18,16 +18,6 @@ import fabops.redis
 
 
 @task
-def install_opsbot():
-    if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
-        if not fabops.common.user_exists('opsbot'):
-            fabops.users.adduser('opsbot', 'ops.keys')
-
-        sudo('pip install fabric')
-
-        execute('fabops.nodejs.install_Node', 'opsbot', 'v0.10.12', '/home/opsbot/')
-
-@task
 def install_blog():
     if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
         if env.host_string in env.apps:
@@ -199,7 +189,7 @@ def deploy(projectName):
                                                       os.path.join(env.our_path, 'keys', projectConfig['repository_site.key']), 
                                                       projectConfig['repository_site.key'])
 
-                        update_project(projectName, projectConfig)
+                        updateProject(projectName, projectConfig)
 
 @task
 def deploy_task(projectName, taskName):
