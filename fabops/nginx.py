@@ -12,7 +12,7 @@ from fabric.context_managers import cd
 
 import fabops.common
 
-_version   = '1.5.1'
+_version   = '1.5.4'
 _tarball   = 'nginx-%s.tar.gz' % _version
 _url       = 'http://nginx.org/download/%s' % _tarball
 _tmp_dir   = '/tmp/nginx-%s' % _version
@@ -78,6 +78,7 @@ def install(force=False):
 
     if not exists('/var/log/nginx'):
         sudo('mkdir /var/log/nginx')
+        sudo('chown %s:%s /var/log/nginx' % (_username, _username))
 
     for p in ['ops-common', 'conf.d', 'ssl-keys']:
         if not exists('/etc/nginx/%s' % p):
@@ -113,6 +114,8 @@ def deploy(projectConfig):
     if 'nginx.ssl_cert_key' in projectConfig:
         put(os.path.join(env.our_path, 'keys', projectConfig['nginx.ssl_cert_key']), 
             '/etc/nginx/ssl-keys/%s' % projectConfig['nginx.ssl_cert_key'], use_sudo=True)
+
+    env.projects[projectConfig['name']]['logs']['nginx'].append(projectConfig['nginx.sitename'])
 
     if 'repository_site.type' in projectConfig:
         repoUrl      = projectConfig['repository_site.url']

@@ -1,6 +1,6 @@
     server {
         listen       %(nginx.port)s;
-        server_name  conversat.io %(nginx.sitename)s;
+        server_name  %(nginx.sitename)s;
 
         location / {
             rewrite ^(.*)  https://%(nginx.sitename)s$1 last;
@@ -8,7 +8,7 @@
     }
     server {
         listen       %(nginx.ssl_port)s ssl;
-        server_name  conversat.io %(nginx.sitename)s;
+        server_name  %(nginx.sitename)s;
 
         ssl_certificate     /etc/nginx/ssl-keys/%(nginx.ssl_cert)s;
         ssl_certificate_key /etc/nginx/ssl-keys/%(nginx.ssl_cert_key)s;
@@ -16,7 +16,7 @@
         root         %(nginx.root)s;
 
         error_log    /var/log/nginx/%(nginx.sitename)s_error.log;
-        access_log   /var/log/nginx/%(nginx.sitename)s_access.log logstash_json;
+        access_log   /var/log/nginx/%(nginx.sitename)s_access.log main;
 
         location ~ /\. {
                 deny all;
@@ -28,9 +28,9 @@
             try_files $uri $uri/ =404;
         }
         location / {
-            try_files $uri @talky;
+            try_files $uri @dev;
         }
-        location @talky {
+        location @dev {
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto https;

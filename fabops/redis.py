@@ -13,14 +13,13 @@ from fabric.context_managers import cd
 import fabops.common
 
 _major_version = '2.6'
-_minor_version = '.10'
+_minor_version = '.16'
 
 _version  = '%s%s' % (_major_version, _minor_version)
 _tarball  = 'redis-%s.tar.gz' % _version
 _tmp_dir  = '/tmp/redis-%s' % _version
 _username = 'redis'
-_url      = 'http://redis.googlecode.com/files/%s' % _tarball
-
+_url      = 'http://download.redis.io/releases/%s' % _tarball
 
 @task
 def download():
@@ -80,7 +79,7 @@ def install(cfg, force=False):
 def deploy(nodeName, projectConfig):
     redisNode = 'redis.ports.%s' % nodeName
     if redisNode in projectConfig:
-        if projectConfig['qa']:
+        if projectConfig['ci'] == 'beta':
             dataroot = '/var/lib/redis'
         else:
             dataroot = projectConfig['redis.datadir']

@@ -342,8 +342,6 @@ def baseline(user=None):
         devtools()
         processcontrol()
         alerts()
-        install_monit()
-
 
 @task()
 def bootstrap(user=None):
@@ -383,3 +381,34 @@ def bootstrap(user=None):
         upload_template('templates/screenrc', '/home/ops/.screenrc', use_sudo=True)
 
         sudo('touch /etc/andyet_ops_bootstrap')
+
+@task()
+def secteam():
+    """baseline install for the SecTeam tool server
+    """
+    with settings(user='root'):
+        add_ops_user()
+        apt_update()
+        apt_upgrade()
+        disablex11()
+        disableroot()
+        disablepasswordauth()
+
+        for p in ('ntp', 'fail2ban', 'screen', 'unzip', 'wget', 'git', 'subversion', 
+                  'build-essential', 'pkg-config', 'python-pip', 'python-virtualenv',
+                  'gnutls-bin', 'openssl', 'libssl-dev', 'gnupg', 'gpgv',
+                  'python-gnutls', 'nmap', 'python-nmap', 'liblua5.2-dev',
+                 ):
+            fabops.common.install_package(p)
+
+        for u in ('baldwin', 'mlowe', 'nlf'):
+            fabops.users.adduser(u, 'ops.keys', True)
+            sudo('gpasswd -a %s ops' % u)
+
+        run('wget http://nmap.org/dist/nmap-6.40.tar.bz2')
+        run('tar xf nmap-6.40.tar.bz2')
+
+        with cd('/root/nmap-6.40'):
+            run('./configure')
+            run('make')
+            run('make install')

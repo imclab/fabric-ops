@@ -68,7 +68,7 @@ def user_exists(username):
     See if a user exists
     """
     with settings(warn_only = True):
-        return 'No such user' not in run('id %s' % username)
+        return 'o such user' not in run('id %s' % username)
 
 def get_home(username):
     """
@@ -103,10 +103,11 @@ def config(cfgFilename='fabric.cfg'):
     setattr(env, 'projects',  {})
     setattr(env, 'defaults',  {})
     setattr(env, 'dns',       {})
+    setattr(env, 'andyet',    {})
     setattr(env, 'overrides', {})
 
     for opt in cfg.keys():
-        if opt in ('user', 'key_filename', 'hosts', 'projects', 'overrides', 'defaults', 'dns', 'projectDir', 'pinned'):
+        if opt in ('user', 'key_filename', 'hosts', 'projects', 'overrides', 'defaults', 'andyet', 'dns', 'projectDir', 'pinned', 'reports'):
 
             if opt == 'projects':
                 for h in cfg[opt].keys():

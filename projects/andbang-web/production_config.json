@@ -17,13 +17,19 @@
         "secret": "%(andyet.secret)s"
     },
     "andyetAPIs": {
-        "shippy": "%(andyet.apiUrl)s",
-        "apps": "%(andyet.appSiteUrl)s"
+        "apps": "%(andyet.appsUrl)s",
+        "shippy": "%(andyet.shippyAPI)s",
+        "talky": "%(andyet.talkyAPI)s"
     },
     "bucker": {
-        "app": "/var/log/%(name)s/shippy-app.log",
-        "access": "/var/log/%(name)s/shippy-access.log",
-        "console": false,
-        "level": "debug"
+        "console": true,
+        "level": "debug",
+        "logstash": {
+            "redis": true,
+            "host": "%(dns.logstash.ip)s",
+            "key":  "bucker",
+            "channel": true,
+            "source_host": "%(hostname)s"
+        }
     }
 }

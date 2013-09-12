@@ -44,8 +44,14 @@
         }
     },
     "bucker": {
-        "app": "%(logDir)s/api.log",
-        "access": "%(logDir)s/api-access.log",
-        "console": true
+        "console": true,
+        "level": "debug",
+        "logstash": {
+            "redis": true,
+            "host": "%(dns.logstash.ip)s",
+            "key":  "bucker",
+            "channel": true,
+            "source_host": "%(hostname)s"
+        }
     }
 }

@@ -19,13 +19,13 @@
         },
         "redis": {
             "host": "%(dns.redis_api.ip)s",
-            "port": %(dns.redis_api.port)s,
+            "port": %(dns.redis_api.port)s
         }
     },
     "redis": {
         "thoonk": {
             "host": "%(dns.redis_api.ip)s",
-            "port": %(dns.redis_api.port)s,
+            "port": %(dns.redis_api.port)s
         }
     }
 }

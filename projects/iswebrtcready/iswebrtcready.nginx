@@ -1,0 +1,8 @@
+    server {
+        listen       %(nginx.port)s;
+        server_name  iswebrtcgoodyet.com iswebrtcready.org iswebrtcready.com iswebrtcreadyyet.org;
+        location / {
+               rewrite ^/(.*)$ http://iswebrtcreadyyet.com/$1 permanent;
+        }
+
+    }

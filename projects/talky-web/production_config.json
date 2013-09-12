@@ -1,5 +1,6 @@
 {
     "isDev": false,
+    "mixpanel": "4f9fd79a6827838ce81d84cd70d535cd",
     "andyetAuth": {
         "id": "%(andyet.id)s",
         "secret": "%(andyet.secret)s"

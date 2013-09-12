@@ -11,7 +11,7 @@ import socket
 
 
 
-def getSiteConfig(siteDir, siteName, qa=False):
+def getSiteConfig(siteDir, siteName, ci='beta'):
     siteCfgDir  = os.path.join(os.path.abspath(siteDir), siteName)
     siteCfgFile = os.path.join(siteCfgDir, '%s.cfg' % siteName)
     siteConfig  = {}
@@ -24,7 +24,7 @@ def getSiteConfig(siteDir, siteName, qa=False):
             print(sys.exc_info())
             siteConfig = {}
 
-    siteConfig['qa']              = qa
+    siteConfig['ci']              = ci
     siteConfig['site_config_dir'] = siteCfgDir
     siteConfig['site_config']     = siteCfgFile
 
@@ -38,7 +38,7 @@ def getSiteConfig(siteDir, siteName, qa=False):
 
     return siteConfig
 
-def getAppConfig(appDir, appName, qa=False):
+def getAppConfig(appDir, appName, ci='beta'):
     appCfgDir  = os.path.join(os.path.abspath(appDir), appName)
     appCfgFile = os.path.join(appCfgDir, '%s.cfg' % appName)
     appConfig  = {}
@@ -51,7 +51,7 @@ def getAppConfig(appDir, appName, qa=False):
             print(sys.exc_info())
             appConfig = {}
 
-        appConfig['qa']             = qa
+        appConfig['ci']             = ci
         appConfig['app_config_dir'] = appCfgDir
         appConfig['app_config']     = appCfgFile
 

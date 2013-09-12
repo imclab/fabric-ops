@@ -1,0 +1,20 @@
+{
+    "plugins":      "./plugins/",
+    "server":       "irc.andbang.com",
+    "port":          6667,
+    "nickname":     "opsbot",
+    "username":     "opsbot",
+    "realname":     "andyet",
+    "password":     "bb321aec",
+    "autorejoin":    true,
+    "debug":         true,
+    "secure":        true,
+    "nickpassword": "4nVLwnfBswpIjTOxK8Ib6A4vXM",
+    "channels":     ["#ops", "#andyet"],
+    "python":       "python",
+    "fabops":       "/home/opsbot/fabops",
+    "getconfig": {
+        "colors": true,
+        "silent": false
+    }
+}

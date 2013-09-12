@@ -1,0 +1,18 @@
+{
+  "session": {
+    "secret": "nodesec_5193c817376314bab4cd7eac7bed337a"
+  },
+    "mongo": {
+        "connect_string": "mongodb://nodesecurity-production:zGMN6T94fdt9wafn@ds029257.mongolab.com:29257/nodesecurity-production",
+        "local_connect_string": "mongodb://localhost/nodesecurity-dev"
+    },
+  "bucker": {
+    "app": "/var/log/nodesecurity.io/app.log",
+    "access": "/var/log/nodesecurity.io/logs/access.log",
+    "console": false
+  },
+  "githubApi": {
+    "type": "oauth",
+    "token": "1f57e9d7b297d1c6d99479eaa8d61f1a502ad2cb"
+  }
+}

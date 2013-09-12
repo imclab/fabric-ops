@@ -101,24 +101,7 @@ def install(cfg, force=False):
     sudo('mkdir -p /var/log/haproxy')
     sudo('chown root:root /var/log/haproxy')
 
-    cfg['haproxy.ssl-key'] = '/etc/haproxy/ssl-keys/%s' % cfg['haproxy.pemfile']
-    cfg['ops_header']      = _503_header
-
-    put('keys/%s' % cfg['haproxy.pemfile'], cfg['haproxy.ssl-key'], use_sudo=True)
-
-    upload_template('templates/andyet_error.html', '%s/errors/503-error.http' % _cfg_root, 
-                    context=cfg, use_sudo=True)
-    sudo('chown root:root %s/errors/503-error.http' % _cfg_root)
-
-    upload_template('templates/haproxy/haproxy.base', '/etc/haproxy/haproxy.base', context=cfg, use_sudo=True)
-    sudo('chown root:root /etc/haproxy/haproxy.base')
-
-    put('templates/haproxy/49-haproxy.conf', '/etc/rsyslog.d/49-haproxy.conf', use_sudo=True)
-    sudo('chown root:root /etc/rsyslog.d/49-haproxy.conf')
-    sudo('service rsyslog restart')
-
     enable_runit()
-
 
 @task
 def install_site(projectName, projectConfig):
@@ -132,6 +115,25 @@ def install_site(projectName, projectConfig):
                         context=projectConfig,
                         use_sudo=True)
         sudo('chown root:root %s' % configFile)
+
+        projectConfig['ops_header'] = _503_header
+
+        upload_template('templates/andyet_error.html', '%s/errors/503-error.http' % _cfg_root, 
+                    context=projectConfig, use_sudo=True)
+        sudo('chown root:root %s/errors/503-error.http' % _cfg_root)
+
+        projectConfig['haproxy.ssl-pem'] = '/etc/haproxy/ssl-keys/%s' % projectConfig['haproxy.pemfile']
+        # projectConfig['haproxy.ssl-key'] = '/etc/haproxy/ssl-keys/%s' % projectConfig['haproxy.keyfile']
+
+        put('keys/%s' % projectConfig['haproxy.pemfile'], projectConfig['haproxy.ssl-pem'], use_sudo=True)
+        # put('keys/%s' % projectConfig['haproxy.keyfile'], projectConfig['haproxy.ssl-key'], use_sudo=True)
+
+        upload_template('templates/haproxy/haproxy.base', '/etc/haproxy/haproxy.base', context=projectConfig, use_sudo=True)
+        sudo('chown root:root /etc/haproxy/haproxy.base')
+
+        put('templates/haproxy/49-haproxy.conf', '/etc/rsyslog.d/49-haproxy.conf', use_sudo=True)
+        sudo('chown root:root /etc/rsyslog.d/49-haproxy.conf')
+        sudo('service rsyslog restart')
 
         put('templates/haproxy/build_config.sh', '%s/build_config.sh' % _cfg_root, use_sudo=True)
         sudo('chmod +x %s/build_config.sh' % _cfg_root)

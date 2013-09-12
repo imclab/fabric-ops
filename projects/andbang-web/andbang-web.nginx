@@ -16,7 +16,7 @@
         root         %(nginx.root)s;
 
         error_log    /var/log/nginx/%(nginx.sitename)s_error.log;
-        access_log   /var/log/nginx/%(nginx.sitename)s_access.log main;
+        access_log   /var/log/nginx/%(nginx.sitename)s_access.log logstash_json;
 
         location ~ /\. {
                 deny all;

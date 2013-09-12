@@ -7,8 +7,9 @@
         "port": 6697,
         "cert": "/etc/haproxy/ssl-keys/%(haproxy.pemfile)s",
         "key": "/etc/haproxy/ssl-keys/%(haproxy.keyfile)s",
-        "systemUser": "shippy",
-        "name": "Shippy"
+        "systemUser": "andbang",
+        "name": "AndBang",
+        "operators": ["7", "12"]
     },
     "http": {
         "listen": " %(dns.irc-shippy.ip)s",
@@ -33,18 +34,19 @@
         "shippy": "%(andyet.apiUrl)s",
         "apps": "%(andyet.appSiteUrl)s"
     },
+    "intercom": {
+        "id": "z6ub4pxr", 
+        "secret": "c8c51bc499a6e1220e5ff78ebb57ec5f1b8b5adf"
+    },
     "bucker": {
-        "app": {
-            "filename": "/var/log/irc-shippy/irc-app.log",
-            "format": ":time :level :data",
-            "timestamp": "YYYY-MM-DDTHH:mm:ss"
-        },
-        "access": {
-            "filename": "/var/log/irc-shippy/irc-access.log",
-            "format": ":time :level :data",
-            "timestamp": "YYYY-MM-DDTHH:mm:ss"
-        },
-        "console": false,
-        "level": "debug"
+        "console": true,
+        "level": "debug",
+        "logstash": {
+            "redis": true,
+            "host": "%(dns.logstash.ip)s",
+            "key":  "bucker",
+            "channel": true,
+            "source_host": "%(hostname)s"
+        }
     }
 }

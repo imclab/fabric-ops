@@ -1,0 +1,39 @@
+{
+    "env": "production",
+    "http": {
+        "listen": "127.0.0.1",
+        "port": %(nginx.proxy_port)s
+    },
+    "baseUrl": "https://developer.andbang.com",
+    "apiUrl": "https://api.andbang.com",
+    "session": {
+        "host": "localhost",
+        "port": 6380,
+        "db": 1,
+        "secret": "bang!",
+        "secure": true
+    },
+    "andyetAuth": {
+        "id": "%(andyet.id)s",
+        "secret": "%(andyet.secret)s"
+    },
+    "andyetAPIs": {
+        "apps": "%(andyet.appsUrl)s",
+        "shippy": "%(andyet.shippyAPI)s",
+        "talky": "%(andyet.talkyAPI)s"
+    },
+    "bucker": {
+        "app": "/var/log/%(name)s/developer-app.log",
+        "access": "/var/log/%(name)s/developer-access.log",
+        "console": false,
+        "level": "debug"
+    },
+    "oauth": {
+        "clientId": "developer.andbang.com",
+        "secret": "bb7d794aa36a335b4a193c6907d8f62b7a411b1a",
+        "callbackURL": "https://developer.andbang.com/auth/andbang/callback",
+        "accountsURL": "https://accounts.andbang.com",
+        "apiURL": "https://api.andbang.com",
+        "local": false
+    }
+}

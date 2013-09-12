@@ -74,6 +74,13 @@ def deploy(projectConfig, force=True):
         else:
             nodeVersion = _node_version
 
+        if 'config_dir' in projectConfig:
+            appConfigDir = projectConfig['config_dir']
+        else:
+            appConfigDir = projectConfig['appDir']
+
+        appConfigDir = os.path.join(projectConfig['homeDir'], appConfigDir)
+
         if force and not exists(os.path.join(projectConfig['homeDir'], '.nvm')):
             install_Node(projectConfig['deploy_user'], nodeVersion,  projectConfig['homeDir'])
 
@@ -84,23 +91,18 @@ def deploy(projectConfig, force=True):
         if exists(projectConfig['deploy_dir']):
             with cd(projectConfig['deploy_dir']):
                 run('ssh-add -D; ssh-add ~/.ssh/%s' % projectConfig['deploy_key'])
-                run('git pull origin %s' % projectConfig['deploy_branch'])
                 run('git checkout %s' % projectConfig['deploy_branch'])
 
                 if repoKey is not None:
                     run('ssh-add -D; ssh-add ~/.ssh/%s' % repoKey)
+            with cd(appConfigDir):
                 run('. %s/.nvm/nvm.sh; npm install %s' % (projectConfig['homeDir'], _npm_params))
 
         upload_template('templates/project_deploy.sh', 'deploy.sh', context=projectConfig)
         run('chmod +x %s' % os.path.join(projectConfig['homeDir'], 'deploy.sh'))
 
-        if 'config_dir' in projectConfig:
-            appConfigDir = projectConfig['config_dir']
-        else:
-            appConfigDir = projectConfig['appDir']
-
-        appConfigDir = os.path.join(projectConfig['homeDir'], appConfigDir)
-
         upload_template(os.path.join(projectConfig['configDir'], 'production_config.json'),
                         os.path.join(appConfigDir,               'production_config.json'),
                         context=projectConfig)
+
+        env.projects[projectConfig['name']]['logs']['bucker'].append(projectConfig['name'])

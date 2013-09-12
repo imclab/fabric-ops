@@ -1,0 +1,18 @@
+   server {
+        listen       %(nginx.port)s;
+        server_name  %(nginx.sitename)s;
+
+        root         %(nginx.root)s;
+
+        error_log    /var/log/nginx/%(name)s_error.log;
+        access_log   /var/log/nginx/%(name)s_access.log main;
+
+        location ~ /\. {
+                deny all;
+                return 404;
+        }
+
+        location  / {
+            try_files $uri $uri/index.html /index.html;
+        }
+    }

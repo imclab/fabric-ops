@@ -1,0 +1,14 @@
+    server {
+        listen       %(nginx.port)s;
+        server_name  %(nginx.sitename)s;
+
+        auth_basic            "Restricted";
+        auth_basic_user_file  reports_auth;
+
+        error_log    /var/log/nginx/%(deploy_user)s_error.log;
+        access_log   /var/log/nginx/%(deploy_user)s_access.log main;
+
+        location  / {
+            root /home/reports/;
+            try_files  $uri $uri/ $uri/index.html index.html =404;        }
+    }

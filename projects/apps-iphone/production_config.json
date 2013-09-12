@@ -1,0 +1,24 @@
+{
+    "api_url": "https://api.andbang.com",
+    "webhook_url": "http://notify.shippy.io/webhook/notify",
+    "ios": {
+        "webhooks": {
+            "enabled": true
+        },
+        "apn": {
+            "gateway": "gateway.push.apple.com",
+            "passphrase": "Ad9TYMgueCz5p2sw",
+            "key": "/etc/haproxy/notify.shippy.io.key",
+            "cert": "/etc/haproxy/notify.shippy.io.pem"
+        }
+    },
+    "redis": {
+        "host": "127.0.0.1",
+        "port": "6380",
+        "db": 0
+    },
+    "http": {
+        "host": "127.0.0.1",
+        "port": 3040
+    }
+}

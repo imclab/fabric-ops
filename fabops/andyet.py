@@ -15,7 +15,82 @@ from fabric.context_managers import cd
 
 import fabops.common
 import fabops.redis
+import fabops.nodejs
 
+@task
+def install_reports():
+    if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+        projectConfig = getProjectConfig('reports', 'reports')
+
+        if not fabops.common.user_exists('reports'):
+            fabops.users.adduser('reports', 'ops.keys')
+
+        with settings(user='reports', use_sudo=True):
+            if not exists('/home/reports/.nvm'):
+                fabops.nodejs.install_Node('reports', projectConfig['node'], '/home/reports/')
+
+            with cd('/home/reports/'):
+                run('. /home/reports/.nvm/nvm.sh; npm install -g plato')
+
+_report_link = """
+<p><a href="%(name)s_%(branch)s/plato/index.html">%(name)s %(branch)s</a></p>
+"""
+_update_bash_script = """#!/bin/bash
+
+"""
+@task
+def run_reports():
+    if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+        projectConfig = getProjectConfig('reports', 'reports')
+
+        s = ''
+        for p in env.reports:
+            r = env.reports[p]
+            r['name'] = p
+            s += _report_link % r
+            if not exists('/home/reports/.ssh/%s' % r['key']):
+                fabops.users.adddeploykey('reports', 
+                                          os.path.join(env.our_path, 'keys', r['key']), 
+                                          r['key'])
+
+        projectConfig['reports_links'] = s
+
+        if 'nginx.sitename' in projectConfig:
+            execute('fabops.nginx.deploy', projectConfig)
+
+        with settings(user='reports', use_sudo=True):
+            upload_template('templates/reports_index.html', 'index.html', context=projectConfig)
+            s = _update_bash_script
+            for p in env.reports:
+                r = env.reports[p]
+                if not exists('/home/reports/%s_%s' % (p, r['branch'])):
+                    run('mkdir -p /home/reports/%s_%s/plato' % (p, r['branch']))
+                s += 'echo "processing %s %s"\n' % (p, r['branch'])
+                s += 'cd /home/reports/%s_%s\n' % (p, r['branch'])
+                s += 'ssh-add -D; ssh-add ~/.ssh/%s\n' % r['key']
+                s += 'rm -rf /home/reports/%s_%s/%s\n' % (p, r['branch'], p)
+                s += 'git clone %s\n' % r['repo']
+                s += 'cd /home/reports/%s_%s/%s\n' % (p, r['branch'], p)
+                s += 'git pull origin %s\n' % r['branch']
+                s += 'git checkout %s\n' % r['branch']
+                s += 'REPORT_PATH=/home/reports/%s_%s/plato ./scripts/reports.sh\n' % (p, r['branch'])
+                s += '\n'
+            append('/home/reports/update.sh', s)
+            run('chmod +x /home/reports/update.sh')
+
+@task
+def install_kochiku(force=False):
+    if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+        cfg = getProjectConfig('kochiku', 'prod', 'ops')
+
+        execute('fabops.kochiku.install', cfg, force)
+
+@task
+def install_logstash(force=False):
+    if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+        cfg = getProjectConfig('logs', 'prod', 'ops')
+
+        execute('fabops.logstash.install', cfg, force)
 
 @task
 def install_blog():
@@ -42,92 +117,126 @@ def install_blog():
                     print("you will also need to chmod +r the Dropbox folder so nginx can see it")
                     print("*"*42)
 
-def getProjectConfig(projectName, hostName, itemName=None):
+def getProjectConfig(projectName, ci, hostName, itemName=None):
     if itemName is None:
         itemName = projectName
-    projectCfgDir = os.path.join(os.path.abspath(env.projectDir), itemName)
+    projectCfgDir  = os.path.join(os.path.abspath(env.projectDir), itemName)
     projectCfgFile = os.path.join(projectCfgDir, '%s.cfg' % itemName)
     projectConfig  = {}
 
     if os.path.exists(projectCfgFile):
-        try:
-            projectConfig               = json.load(open(projectCfgFile, 'r'))
+        projectConfig               = json.load(open(projectCfgFile, 'r'))
+        projectConfig['name']       = itemName
+        projectConfig['configDir']  = projectCfgDir
+        projectConfig['configFile'] = projectCfgFile
+        projectConfig['ci']         = ci
+        projectConfig['hostname']   = hostName
 
-            projectConfig['name']       = itemName
-            projectConfig['configDir']  = projectCfgDir
-            projectConfig['configFile'] = projectCfgFile
-            projectConfig['homeDir']    = '/home/%s' % projectConfig['deploy_user']
-            projectConfig['logDir']     = '/var/log/%s' % itemName
+        if 'deploy_user' in projectConfig:
+            projectConfig['homeDir'] = '/home/%s' % projectConfig['deploy_user']
+            projectConfig['logDir']  = '/var/log/%s' % itemName
 
             if 'app_dir' in projectConfig:
                 projectConfig['appDir'] = '/home/%s/%s' % (projectConfig['deploy_user'], projectConfig['app_dir'])
             else:
                 projectConfig['appDir'] = '/home/%s/%s' % (projectConfig['deploy_user'], itemName)
 
-            if projectName in env.projects and 'qa' in env.projects[projectName]:
-                projectConfig['qa'] = env.projects[projectName]['qa']
+        defaultConfig = fabops.common.flatten(env.defaults)
+        projectConfig = fabops.common.flatten(projectConfig)
 
-            defaultConfig = fabops.common.flatten(env.defaults)
-            projectConfig = fabops.common.flatten(projectConfig)
+        for k in defaultConfig:
+            if k not in projectConfig:
+                projectConfig[k] = defaultConfig[k]
 
-            for k in defaultConfig:
-                if k not in projectConfig:
-                    projectConfig[k] = defaultConfig[k]
+        dnsConfig = fabops.common.flatten(env.dns[projectConfig['ci']])
+        for k in dnsConfig:
+            projectConfig['dns.%s' % k] = dnsConfig[k]
 
-            if hostName in env.overrides:
-                for k in env.overrides[hostName]:
-                    projectConfig[k] = env.overrides[hostName][k]
+        andyetConfig = fabops.common.flatten(env.andyet[projectConfig['ci']])
+        for k in andyetConfig:
+            projectConfig['andyet.%s' % k] = andyetConfig[k]
 
-            if projectConfig['qa']:
-                s = 'qa'
+        if 'deploy_branch' not in projectConfig:
+            if projectConfig['ci'] == 'beta':
+                projectConfig['deploy_branch'] = 'beta'
             else:
-                s = 'prod'
-            dnsConfig = fabops.common.flatten(env.dns[s])
+                projectConfig['deploy_branch'] = 'master'
 
-            for k in dnsConfig:
-                projectConfig['dns.%s' % k] = dnsConfig[k]
+        if hostName in env.overrides:
+            for k in env.overrides[hostName]:
+                projectConfig[k] = env.overrides[hostName][k]
 
-        except:
-            print('error parsing configuration file %s' % projectCfgFile)
-            print(sys.exc_info())
-            projectConfig = {}
 
     return projectConfig
 
-def checkHost(projectName, prod):
+def checkHost(projectName, ci):
     if env.host_string is None:
         hosts   = []
         project = env.projects[projectName]
 
-        if prod:
-            hosts = project['hosts']
-        else:
-            for host in project['hosts']:
-                projectConfig = getProjectConfig(projectName, host)
-                if projectConfig['qa']:
-                    hosts.append(host)
+        for host in project['hosts']:
+            projectConfig = getProjectConfig(projectName, ci, host)
+            if projectConfig['ci'] == ci:
+                hosts.append(host)
+
         env.host_string = hosts[0]
         env.hosts.extend(hosts)
 
-def loadProject(projectName, prod):
-    if projectName in env.projects:
-        checkHost(projectName, prod)
+        print 'generating', ci, 'environment for', env.hosts
 
-        return getProjectConfig(projectName, env.host_string)
+def loadProject(projectName, ci):
+    if projectName in env.projects:
+        checkHost(projectName, ci)
+        return getProjectConfig(projectName, ci, env.host_string)
     else:
         return None
 
 @task
-def deployProject(projectName, prod=False):
+def deployProject(projectName, ci):
     if projectName in env.projects:
-        checkHost(projectName, prod)
+        checkHost(projectName, ci)
+        execute('fabops.andyet.deploy', projectName, ci)
 
-        execute('fabops.andyet.deploy', projectName)
+_logstash_bucker = """
+        file {
+                type => "bucker_app"
+                path => ["/var/log/%s/*.log"]
+                exclude => ["*.gz"]
+                sincedb_path => "/opt/logstash"
+                debug => true
+        }
+        file {
+                type => "bucker_console"
+                path => ["/var/log/%s/current"]
+                exclude => ["*.gz"]
+                sincedb_path => "/opt/logstash"
+                debug => true
+        }
+"""
+_logstash_nginx = """
+        file {
+                type => "nginx_access"
+                path => ["/var/log/nginx/%s_access.log"]
+                exclude => ["*.gz"]
+                format => "json_event"
+                sincedb_path => "/opt/logstash"
+                debug => true
+                add_field => ["source", "%s"]
+                add_field => ["source_host", "%s"]
+        }
+        file {
+                type => "nginx_error"
+                path => ["/var/log/nginx/%s_error.log"]
+                exclude => ["*.gz"]
+                sincedb_path => "/opt/logstash"
+                debug => true
+                add_field => ["source", "%s"]
+                add_field => ["source_host", "%s"]
+        }
+}"""
 
 @task
-def updateProject(projectName, prod=False):
-    checkHost(projectName, prod)
-
+def deploy(projectName, ci):
     if projectName not in env.projects:
         print('%s not found in list of known projects')
     else:
@@ -136,36 +245,15 @@ def updateProject(projectName, prod=False):
         else:
             if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
                 project       = env.projects[projectName]
-                projectConfig = getProjectConfig(projectName, env.host_string)
+                projectConfig = getProjectConfig(projectName, ci, env.host_string)
 
-                if 'nginx.sitename' in projectConfig:
-                    execute('fabops.nginx.deploy', projectConfig)
-                if 'monit.type' in projectConfig:
-                    execute('fabops.provision.add_app_to_monit', projectConfig, projectName)
-                if 'upstart.type' in projectConfig:
-                    execute('fabops.provision.add_app_to_upstart', projectConfig, projectName)
-                    if projectConfig['upstart.type'] == 'node':
-                        execute('fabops.nodejs.deploy', projectConfig)
-                if 'runit.type' in projectConfig:
-                    execute('fabops.runit.update_app', projectConfig)
-                    if projectConfig['runit.type'] == 'node':
-                        execute('fabops.nodejs.deploy', projectConfig)
-
-@task
-def deploy(projectName):
-    if projectName not in env.projects:
-        print('%s not found in list of known projects')
-    else:
-        if not exists('/etc/andyet_ops_bootstrap'):
-            print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
-        else:
-            if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
-                project       = env.projects[projectName]
-                projectConfig = getProjectConfig(projectName, env.host_string)
+                project['logs'] = { "bucker": [],
+                                    "nginx": [],
+                                  }
 
                 if 'tasks' in project:
                     for task in project['tasks']:
-                        execute('fabops.andyet.deploy_task', projectName, task)
+                        execute('fabops.andyet.deploy_task', projectName, task, ci)
 
                 if 'haproxy.acls' in projectConfig:
                     execute('fabops.haproxy.install_site', projectName, projectConfig)
@@ -189,39 +277,71 @@ def deploy(projectName):
                                                       os.path.join(env.our_path, 'keys', projectConfig['repository_site.key']), 
                                                       projectConfig['repository_site.key'])
 
-                        updateProject(projectName, projectConfig)
+                    updateProject(projectName, projectConfig)
+
+                if 'tasks' in project and 'logstash' in project['tasks']:
+                    s = ''
+                    if len(project['logs']['bucker']) > 0:
+                        for item in project['logs']['bucker']:
+                            s += _logstash_bucker % (item, item)
+                        for item in project['logs']['nginx']:
+                            s += _logstash_nginx % (item, item, env.host_string, item, item, env.host_string)
+
+                    projectConfig['logstash_files'] = s
+
+                    upload_template('templates/logstash/logstash.conf',
+                                    '/etc/logstash/logstash.conf',
+                                    context=projectConfig, use_sudo=True)
+
+def updateProject(projectName, projectConfig):
+    if 'nginx.sitename' in projectConfig:
+        execute('fabops.nginx.deploy', projectConfig)
+    if 'monit.type' in projectConfig:
+        execute('fabops.provision.add_app_to_monit', projectConfig, projectName)
+
+    if 'runit.start' in projectConfig:
+        execute('fabops.runit.update_app', projectConfig)
+        if projectConfig['runit.type'] == 'node':
+            execute('fabops.nodejs.deploy', projectConfig)
+    if 'upstart.type' in projectConfig:
+        execute('fabops.provision.add_app_to_upstart', projectConfig, projectName)
+        execute('fabops.nodejs.deploy', projectConfig)
+
+    if 'scripts.post-update' in projectConfig:
+        with settings(user=projectConfig['deploy_user']):
+            run(projectConfig['scripts.post-update'])
 
 @task
-def deploy_task(projectName, taskName):
+def deploy_task(projectName, taskName, ci):
     if not exists('/etc/andyet_ops_bootstrap'):
         print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
     else:
         if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
             if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
-                projectConfig = getProjectConfig(projectName, env.host_string)
-                if taskName in ('nginx', 'redisWeb', 'redisApi', 'errorTests'):
+                projectConfig = getProjectConfig(projectName, ci, env.host_string)
+                if taskName in ('nginx', 'redisWeb', 'redisApi', 'errorTests', 'logstash', 'riak'):
                     execute('fabops.andyet.%s' % taskName, taskName, projectConfig)
 
 @task
-def update_app(projectName, appName):
+def update_app(projectName, appName, ci):
     if not exists('/etc/andyet_ops_bootstrap'):
         print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
     else:
         if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
             if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
-                projectConfig = getProjectConfig(projectName, env.host_string)
+                projectConfig = getProjectConfig(projectName, ci, env.host_string)
                 project       = env.projects[projectName]
 
                 if 'apps' in project and appName in project['apps']:
                     execute('fabops.nodejs.deploy', projectName, projectConfig, force=False)
 
 @task
-def opsbot_status(projectName, prod):
+def opsbot_status(projectName, ci):
     if not exists('/etc/andyet_ops_bootstrap'):
         print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
     else:
         if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
-            checkHost(projectName, prod)
+            checkHost(projectName, ci)
 
             if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
                 projectConfig = getProjectConfig(projectName, env.host_string)
@@ -236,19 +356,26 @@ def opsbot_status(projectName, prod):
                             print('project is not deployed')
 
 @task
-def opsbot_deploy(projectName, prod):
-    if not exists('/etc/andyet_ops_bootstrap'):
-        print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
-    else:
-        updateProject(projectName, prod)
-
-@task
-def opsbot_service(projectName, prod, state):
+def opsbot_deploy(projectName, ci):
     if not exists('/etc/andyet_ops_bootstrap'):
         print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
     else:
         if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
-            checkHost(projectName, prod)
+            checkHost(projectName, ci)
+
+            if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
+                projectConfig = getProjectConfig(projectName, env.host_string)
+                project       = env.projects[projectName]
+
+                updateProject(projectName, projectConfig)
+
+@task
+def opsbot_service(projectName, ci, state):
+    if not exists('/etc/andyet_ops_bootstrap'):
+        print("fabops.provision.bootstrap has NOT been run, cancelling deploy")
+    else:
+        if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+            checkHost(projectName, ci)
 
             if projectName in env.projects and env.host_string in env.projects[projectName]['hosts']:
                 projectConfig = getProjectConfig(projectName, env.host_string)
@@ -260,12 +387,12 @@ def opsbot_service(projectName, prod, state):
                     sudo('sv %s %s' % (state, projectName))
 
 @task
-def opsbot_start(projectName, prod):
-    execute('fabops.andyet.opsbot_service', projectName, prod, 'start')
+def opsbot_start(projectName, ci):
+    execute('fabops.andyet.opsbot_service', projectName, ci, 'start')
 
 @task
-def opsbot_stop(projectName, prod):
-    execute('fabops.andyet.opsbot_service', projectName, prod, 'stop')
+def opsbot_stop(projectName, ci):
+    execute('fabops.andyet.opsbot_service', projectName, ci, 'stop')
 
 @task
 def enable_runit(projectName):
@@ -299,4 +426,8 @@ def redisApi(taskName, projectConfig):
 
 @task
 def riak(taskName, projectConfig):
-    fabops.riak.deploy(taskName, projectConfig)
+    fabops.riak.deploy(taskName)
+
+@task
+def logstash(taskName, projectConfig):
+    execute('fabops.logstash.install', projectConfig)

@@ -1,15 +1,23 @@
 {
     "baseUrl": "%(base_url)s",
-    "accountsAppUrl": "https://apps.andyet.com",
-    "mainAppUrl": "https://shippy.io",
-    "docsAppUrl": "https://developer.shippy.io",
     "origins": "*:*",
     "postageAppKey": "88xZVnHaSU0CoZgw0HXA1uq7jop8xK6X",
-    "oauth": {
-        "loginURL": "https://apps.andyet.com/login",
-        "encryptionSecret": "encryption secret",
-        "signingSecret": "signing secret",
-        "tokenTTL": 9999999999
+    "andyetAPIs": {
+        "apps": "%(andyet.appsUrl)s",
+        "shippy": "%(andyet.shippyAPI)s",
+        "talky": "%(andyet.talkyAPI)s"
+    },
+    "andyetClients": {
+        "shippyWeb": "%(andyet.shippyWeb)s",
+        "shippyDocs": "%(andyet.shippyDocs)s",
+        "shippyIRC": "%(andyet.shippyIRC)s",
+        "talkyWeb": "%(andyet.talkyWeb)s"
+    },
+    "intercom": {
+        "enabled": false,
+        "appId": "wnm0axjn",
+        "secretKey": "AEnniK_YzqQvnAmb-GWyKmzxbaG3OdZnB_KTcbii",
+        "supportEmail": "wnm0axjn@incoming.intercom.io"
     },
     "chargify": {
         "subDomain": "shippy.io",
@@ -22,6 +30,12 @@
         "publicKey": "kb2mkn239hc6jfcz",
         "privateKey": "1eaed87ef60ab632ab87eae390d59078",
         "clientKey": "MIIBCgKCAQEAuiLmcLpU/kDwj97/allQ/Hv+HPYgt7/QiGQGV6BiQfl8PYqeAXD1hw5FGLS+XqUxYiDLp9HpbJB1H7RTndasHnkM9XAkrtFus4HYiqhJtNxGfouRiCmNSrAFMPYoMc11haYrRwqycUm+LqwH0Hxsz9Z7uT5p9UWp88p1OE5ueDKRyzZkWVbcn+9bmojIYHCTRoQJA+0I1ag04EyrqBvjETjb/kG0GtU53ReKIHhTVkIsvZUWobhaaKyTkvqa2p4Z4oYVNfnROTYivi5XksVwbTGKJQjCrCs/bSQljuQyoYVEmD2N91hi6C70XTpR/GyYahb3JZZsKbxwvm5yfUe7xQIDAQAB"
+    },
+    "transloadit": {
+        "apiKey": "e5c341c1b3484dee9a62bd758bab0738",
+        "apiSecret": "28c039d8abd98be70e30d49bb0b8007a5763e5f7",
+        "teamIconAssembly": "e7b655b3fef047818139c7ecebfde4db",
+        "userIconAssembly": "f3dbeead0b5540639290ca072e4f84a3"
     },
     "http": {
         "listen": "127.0.0.1",
@@ -47,18 +61,14 @@
         }
     },
     "bucker": {
-        "app": {
-            "filename": "/var/log/%(name)s/auth-app.log",
-            "format": ":time :level :data",
-            "timestamp": "YYYY-MM-DDTHH:mm:ss"
-        },
-        "access": {
-            "filename": "/var/log/%(name)s/auth-access.log",
-            "format": ":time :level :data",
-            "timestamp": "YYYY-MM-DDTHH:mm:ss"
-        },
-        "console": false,
-        "level": "debug"
+        "console": true,
+        "level": "debug",
+        "logstash": {
+            "redis": true,
+            "host": "%(dns.logstash.ip)s",
+            "key":  "bucker",
+            "source_host": "%(hostname)s"
+        }
     },
     "kissFileName": "kiss_dev.js",
     "replSock": "/tmp/%(name)s.sock",

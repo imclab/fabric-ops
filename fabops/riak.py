@@ -12,7 +12,7 @@ from fabric.context_managers import cd
 
 import fabops.common
 
-_major_version = '1.2'
+_major_version = '1.4'
 _minor_version = '.1'
 
 _version  = '%s%s' % (_major_version, _minor_version)
@@ -55,40 +55,26 @@ def install(force=False, qa=False):
     if not exists('/etc/riak'):
         sudo('mkdir /etc/riak')
 
-    if qa:
-        datadir = '/var/lib/redis'
-    else:
-        datadir = env.riak['datadir']
+    datadir = '/var/lib/riak'
 
-    for d in (env.riak['logdir'], env.riak['piddir'], datadir):
-        if not exists(d):
-            sudo('mkdir %s' % d)
-        sudo('chown %s:%s %s' % (_username, _username, d))
+    sudo('mkdir -p /var/log/riak')
+    sudo('chown %s:%s /var/log/riak' % (_username, _username))
+    sudo('mkdir -p /var/pid/riak')
+    sudo('chown %s:%s /var/pid/riak' % (_username, _username))
+    sudo('mkdir -p /var/lib/riak')
+    sudo('chown %s:%s /var/lib/riak' % (_username, _username))
+    # for d in (env.defaults['riak.logdir'], env.defaults['riak.piddir'], datadir):
+    #     if not exists(d):
+    #         sudo('mkdir %s' % d)
+    #     sudo('chown %s:%s %s' % (_username, _username, d))
 
 @task
 def deploy(qa=False):
     install(qa=qa)
 
-    if qa:
-        dataroot = '/var/lib/riak'
-    else:
-        dataroot = env.riak['datadir']
-
-    d            = env.riak
-    d['datadir'] = dataroot
+    d            = env.defaults['riak']
+    d['datadir'] = '/var/lib/riak'
     
     # we are unable to use upload_template because riak's config file
     # is nothing *but* python format string dilly-doos - ugh
     put('templates/riak/riak.conf', '/etc/riak/app.config', use_sudo=True)
-
-    # do not believe we need an upstart script as the riak deb installs one
-    # but I kept this here in case we decide to change things later
-    # upload_template('templates/riak/upstart.conf', '/etc/init/%s.conf' % s, 
-    #                 context=d,
-    #                 use_sudo=True)
-
-    if exists('/etc/monit/conf.d'):
-        upload_template('templates/monit/riak.conf', '/etc/monit/conf.d/riak.conf',
-                        context=d,
-                        use_sudo=True)
-

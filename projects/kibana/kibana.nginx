@@ -1,0 +1,36 @@
+    server {
+        listen       %(nginx.port)s;
+        server_name  %(nginx.sitename)s;
+
+        error_log    /var/log/nginx/%(deploy_user)s_error.log;
+        access_log   /var/log/nginx/%(deploy_user)s_access.log main;
+
+        location ~ ^/_aliases$ {
+            proxy_pass http://%(nginx.elasticsearch)s:9200;
+            proxy_read_timeout 90;
+        }
+        location ~ ^/.*/_search$ {
+            proxy_pass http://%(nginx.elasticsearch)s:9200;
+            proxy_read_timeout 90;
+        }
+        # Password protected end points
+        location ~ ^/kibana-int/dashboard/.*$ {
+            auth_basic            "Restricted";
+            auth_basic_user_file  reports_auth;
+            proxy_pass http://%(nginx.elasticsearch)s:9200;
+            proxy_read_timeout 90;
+        }
+        location ~ ^/kibana-int/temp.*$ {
+            auth_basic            "Restricted";
+            auth_basic_user_file  reports_auth;
+            proxy_pass http://%(nginx.elasticsearch)s:9200;
+            proxy_read_timeout 90;
+        }
+        location  / {
+            auth_basic            "Restricted";
+            auth_basic_user_file  reports_auth;
+
+            root /home/kibana/kibana/;
+            try_files  $uri $uri/ $uri/index.html index.html =404;        
+        }
+}
