@@ -305,6 +305,10 @@ def updateProject(projectName, projectConfig):
         if projectConfig['runit.type'] == 'node':
             execute('fabops.nodejs.deploy', projectConfig)
 
+    if 'node_app' in projectConfig:
+        with settings(user=projectConfig['deploy_user']):
+            execute('fabops.nodejs.deploy', projectConfig)
+
     if 'scripts.post-update' in projectConfig:
         with settings(user=projectConfig['deploy_user']):
             run(projectConfig['scripts.post-update'])
