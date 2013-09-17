@@ -1,8 +1,10 @@
 {
     "http": {
         "baseUrl": "https://otalk.im",
-        "port": %(nginx.proxy_port)s,
-        "key": "/etc/nginx/ssl-keys/%(nginx.ssl_cert_key)s",
-        "cert": "/etc/nginx/ssl-keys/%(nginx.ssl_cert)s;"
-    } 
+        "port": %(haproxy.app.port)s,
+        "key": "/etc/haproxy/ssl-keys/%(haproxy.keyfile)s",
+        "cert": "/etc/haproxy/ssl-keys/%(haproxy.pemfile)s;"
+    },
+    "andyetAuth": { "id": "%(andyetAuth.id)s"
+    }
 }

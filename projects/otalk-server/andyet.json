@@ -1,0 +1,16 @@
+{
+    "bucker": {
+        "file": {
+            "filename": "/var/log/prosody/auth.log"
+        },
+        "console": false
+    },
+    "andyetAuth": {
+        "id": "%(andyetAuth.id)s",
+        "secret": "%(andyetAuth.secret)s"
+    },
+    "andyetAPIs": {
+        "apps": "https://apps.andyet.com",
+        "shippy": "https://api.andbang.com"
+    }
+}

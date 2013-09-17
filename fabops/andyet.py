@@ -309,6 +309,11 @@ def updateProject(projectName, projectConfig):
         with settings(user=projectConfig['deploy_user']):
             run(projectConfig['scripts.post-update'])
 
+    if 'node_apps' in projectConfig:
+        with settings(user=projectConfig['deploy_user']):
+            for app in projectConfig['node_apps']:
+                run('npm i -g %s' % app)
+
 @task
 def deploy_task(projectName, taskName, ci):
     if not exists('/etc/andyet_ops_bootstrap'):
