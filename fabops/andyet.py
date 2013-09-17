@@ -296,16 +296,14 @@ def deploy(projectName, ci):
 def updateProject(projectName, projectConfig):
     if 'nginx.sitename' in projectConfig:
         execute('fabops.nginx.deploy', projectConfig)
-    if 'monit.type' in projectConfig:
-        execute('fabops.provision.add_app_to_monit', projectConfig, projectName)
+
+    if 'prosody.vhost' in projectConfig:
+        execute('fabops.prosody.deploy', projectConfig)
 
     if 'runit.start' in projectConfig:
         execute('fabops.runit.update_app', projectConfig)
         if projectConfig['runit.type'] == 'node':
             execute('fabops.nodejs.deploy', projectConfig)
-    if 'upstart.type' in projectConfig:
-        execute('fabops.provision.add_app_to_upstart', projectConfig, projectName)
-        execute('fabops.nodejs.deploy', projectConfig)
 
     if 'scripts.post-update' in projectConfig:
         with settings(user=projectConfig['deploy_user']):

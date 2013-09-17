@@ -9,6 +9,7 @@ import fabops.users
 import fabops.stun
 import fabops.runit
 import fabops.nginx
+import fabops.prosody
 import fabops.logstash
 import fabops.kochiku
 import fabops.haproxy
