@@ -98,9 +98,6 @@ def deploy(projectConfig, force=True):
             with cd(appConfigDir):
                 run('. %s/.nvm/nvm.sh; npm install %s' % (projectConfig['homeDir'], _npm_params))
 
-        upload_template('templates/project_deploy.sh', 'deploy.sh', context=projectConfig)
-        run('chmod +x %s' % os.path.join(projectConfig['homeDir'], 'deploy.sh'))
-
         upload_template(os.path.join(projectConfig['configDir'], 'production_config.json'),
                         os.path.join(appConfigDir,               'production_config.json'),
                         context=projectConfig)

@@ -15,4 +15,8 @@
         location  / {
             try_files $uri $uri/index.html /index.html;
         }
-    }
+        error_page  404 500 502 503 504  /andyet_error.html;
+        location = /andyet_error.html {
+            root html;
+        }
+}

@@ -136,10 +136,14 @@ def getProjectConfig(projectName, ci, hostName, itemName=None):
             projectConfig['homeDir'] = '/home/%s' % projectConfig['deploy_user']
             projectConfig['logDir']  = '/var/log/%s' % itemName
 
+            if 'deploy_dir' not in projectConfig:
+                projectConfig['deploy_dir'] = itemName
+
             if 'app_dir' in projectConfig:
                 projectConfig['appDir'] = '/home/%s/%s' % (projectConfig['deploy_user'], projectConfig['app_dir'])
             else:
-                projectConfig['appDir'] = '/home/%s/%s' % (projectConfig['deploy_user'], itemName)
+                projectConfig['app_dir'] = itemName
+                projectConfig['appDir'] =  '/home/%s/%s' % (projectConfig['deploy_user'], itemName)
 
         defaultConfig = fabops.common.flatten(env.defaults)
         projectConfig = fabops.common.flatten(projectConfig)
@@ -293,6 +297,67 @@ def deploy(projectName, ci):
                                     '/etc/logstash/logstash.conf',
                                     context=projectConfig, use_sudo=True)
 
+def deployScripts(projectName, projectConfig):
+    static = 'node' in projectConfig
+    if static:
+        s = 'static'
+    else:
+        s = 'node'
+    deployFile = 'deploy_%s' % s
+
+    print 'STATIC', static
+
+    with settings(user=projectConfig['deploy_user']):
+        deploySeen = False
+        if 'scripts' in projectConfig:
+            for f in projectConfig['scripts']:
+                if f == 'deploy.sh':
+                    deploySeen = True
+                upload_template(os.path.join(projectConfig['configDir'], f), f, context=projectConfig)
+                run('chmod +x %s' % os.path.join(projectConfig['homeDir'], f))
+
+        if not deploySeen:
+            upload_template('templates/%s.sh' % deployFile, 'deploy.sh', context=projectConfig)
+            run('chmod +x %s' % os.path.join(projectConfig['homeDir'], 'deploy.sh'))
+
+    if static:
+        deployStatic(projectName, projectConfig)
+
+def deployStatic(projectName, projectConfig):
+    if 'repository_site.type' in projectConfig:
+        repoUrl      = projectConfig['repository_site.url']
+        tempDir      = os.path.join('/home', projectConfig['deploy_user'], 'work')
+        workDir      = os.path.join(tempDir, projectConfig['name'])
+    if 'repository_site.alias' in projectConfig:
+        targetDir = os.path.join('/home', projectConfig['deploy_user'], projectConfig['repository_site.alias'])
+    else:
+        targetDir = os.path.join('/home', projectConfig['deploy_user'], projectConfig['name'])
+    if 'repository_site.key' in projectConfig:
+        siteKey = projectConfig['repository_site.key']
+        projectConfig['siteKey'] = siteKey
+    else:
+        siteKey = projectConfig['deploy_key']
+        projectConfig['siteKey'] = ''
+
+    if 'repository_site.branch' in projectConfig:
+        deployBranch = projectConfig['repository_site.branch']
+    else:
+        deployBranch = projectConfig['deploy_branch']
+
+    with settings(user=projectConfig['deploy_user']):
+        if exists(tempDir):
+            run('rm -rf %s' % tempDir)
+
+        run('mkdir -p %s' % targetDir)
+        run('mkdir -p %s' % workDir)
+
+        run('ssh-add -D; ssh-add .ssh/%s' % siteKey)
+        run('git clone %s %s' % (repoUrl, workDir))
+
+        with cd(workDir):
+            if run('git checkout %s' % deployBranch):
+                run('cp -r %s/* %s' % (workDir, targetDir))
+
 def updateProject(projectName, projectConfig):
     if 'nginx.sitename' in projectConfig:
         execute('fabops.nginx.deploy', projectConfig)
@@ -305,13 +370,11 @@ def updateProject(projectName, projectConfig):
         if projectConfig['runit.type'] == 'node':
             execute('fabops.nodejs.deploy', projectConfig)
 
+    deployScripts(projectName, projectConfig)
+
     if 'node_app' in projectConfig:
         with settings(user=projectConfig['deploy_user']):
             execute('fabops.nodejs.deploy', projectConfig)
-
-    if 'scripts.post-update' in projectConfig:
-        with settings(user=projectConfig['deploy_user']):
-            run(projectConfig['scripts.post-update'])
 
     if 'node_apps' in projectConfig:
         with settings(user=projectConfig['deploy_user']):

@@ -1,5 +1,5 @@
    server {
-        listen       %(nginx.port)s;;
+        listen       %(nginx.port)s;
         server_name  2013.webrtcamp.com 2013.webrtccamp.com;
 
         root         %(nginx.root)s;
@@ -9,6 +9,11 @@
 
         location  / {
             try_files $uri $uri/ $uri/index.html =404;
+        }
+
+        error_page  404 500 502 503 504  /andyet_error.html;
+        location = /andyet_error.html {
+            root html;
         }
     }
    server {
@@ -27,5 +32,10 @@
 
         location  / {
             rewrite ^/(.*)$ http://2013.webrtccamp.com/$1 break;
+        }
+
+        error_page  404 500 502 503 504  /andyet_error.html;
+        location = /andyet_error.html {
+            root html;
         }
     }

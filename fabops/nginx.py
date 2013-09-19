@@ -117,44 +117,5 @@ def deploy(projectConfig):
 
     env.projects[projectConfig['name']]['logs']['nginx'].append(projectConfig['nginx.sitename'])
 
-    if 'repository_site.type' in projectConfig:
-        repoUrl      = projectConfig['repository_site.url']
-        tempDir      = os.path.join('/home', projectConfig['deploy_user'], 'work')
-        workDir      = os.path.join(tempDir, projectConfig['name'])
-        if 'repository_site.alias' in projectConfig:
-            targetDir = os.path.join('/home', projectConfig['deploy_user'], projectConfig['repository_site.alias'])
-        else:
-            targetDir = os.path.join('/home', projectConfig['deploy_user'], projectConfig['name'])
-        if 'repository_site.key' in projectConfig:
-            siteKey = projectConfig['repository_site.key']
-            projectConfig['siteKey'] = siteKey
-        else:
-            siteKey = projectConfig['deploy_key']
-            projectConfig['siteKey'] = ''
-
-        if 'repository_site.branch' in projectConfig:
-            deployBranch = projectConfig['repository_site.branch']
-        else:
-            deployBranch = projectConfig['deploy_branch']
-
-        if exists(tempDir):
-            sudo('rm -rf %s' % tempDir)
-
-        with settings(user=projectConfig['deploy_user']):
-            run('mkdir -p %s' % targetDir)
-            run('mkdir -p %s' % workDir)
-
-            run('ssh-add -D; ssh-add .ssh/%s' % siteKey)
-            run('git clone %s %s' % (repoUrl, workDir))
-
-            with cd(workDir):
-                if run('git checkout %s' % deployBranch):
-                    run('cp -r %s/* %s' % (workDir, targetDir))
-
-            upload_template('templates/project_deploy.sh', 'deploy.sh', context=projectConfig)
-            run('chmod +x %s' % os.path.join(projectConfig['homeDir'], 'deploy.sh'))
-    else:
-        print('site does not have a defined site repository, skipping')
-
     if sudo('service nginx testconfig'):
         sudo('service nginx restart')
