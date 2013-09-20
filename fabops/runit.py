@@ -47,25 +47,24 @@ def init_app(projectConfig):
 def update_app(projectConfig, force=False, runTemplate='templates/node_runit', logrunTemplate='templates/runit_log', logconfigTemplate=None):
     _init(projectConfig)
     execute('fabops.runit.init_app', projectConfig)
-    if force or not exists(projectConfig['svRun']):
-        upload_template(runTemplate, projectConfig['svRun'], 
-                        context=projectConfig,
-                        use_sudo=True)
-        sudo('chown root:root %(svRun)s' % projectConfig)
-        sudo('chmod 755 %(svRun)s'       % projectConfig)
-    if force or not exists(projectConfig['svRunLog']):
-        upload_template(logrunTemplate, projectConfig['svRunLog'], 
-                        context=projectConfig,
-                        use_sudo=True)
-        sudo('chown root:root %(svRunLog)s' % projectConfig)
-        sudo('chmod 755 %(svRunLog)s'       % projectConfig)
+    upload_template(runTemplate, projectConfig['svRun'], 
+                    context=projectConfig,
+                    use_sudo=True)
+    sudo('chown root:root %(svRun)s' % projectConfig)
+    sudo('chmod 755 %(svRun)s'       % projectConfig)
 
-        if logconfigTemplate is not None:
-            upload_template(logconfigTemplate, projectConfig['svLogConfig'], 
-                            context=projectConfig,
-                            use_sudo=True)
-            sudo('chown root:root %(svLogConfig)s' % projectConfig)
-            sudo('chmod 755 %(svLogConfig)s'       % projectConfig)
+    upload_template(logrunTemplate, projectConfig['svRunLog'], 
+                    context=projectConfig,
+                    use_sudo=True)
+    sudo('chown root:root %(svRunLog)s' % projectConfig)
+    sudo('chmod 755 %(svRunLog)s'       % projectConfig)
+
+    if logconfigTemplate is not None:
+        upload_template(logconfigTemplate, projectConfig['svLogConfig'], 
+                        context=projectConfig,
+                        use_sudo=True)
+        sudo('chown root:root %(svLogConfig)s' % projectConfig)
+        sudo('chmod 755 %(svLogConfig)s'       % projectConfig)
 
     if 'runit.env' in projectConfig:
         for n,v in projectConfig['runit.env']:
