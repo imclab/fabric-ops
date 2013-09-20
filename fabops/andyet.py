@@ -298,7 +298,7 @@ def deploy(projectName, ci):
                                     context=projectConfig, use_sudo=True)
 
 def deployScripts(projectName, projectConfig):
-    static = 'node' in projectConfig
+    static = 'repository_site.url' in projectConfig
     if static:
         s = 'static'
     else:
@@ -368,6 +368,7 @@ def updateProject(projectName, projectConfig):
     if 'runit.start' in projectConfig:
         execute('fabops.runit.update_app', projectConfig)
         if projectConfig['runit.type'] == 'node':
+            projectConfig['restart'] = 'sv restart %s' % projectConfig['name']
             execute('fabops.nodejs.deploy', projectConfig)
 
     deployScripts(projectName, projectConfig)
