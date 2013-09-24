@@ -19,7 +19,9 @@
         }
 
         location  / {
-            try_files $uri $uri/index.html /index.html;
+            rewrite ^/(.*)$ https://tito.io/redistogo/redis-2013 last;
+
+            # try_files $uri $uri/index.html /index.html;
         }
         error_page  404 500 502 503 504  /andyet_error.html;
         location = /andyet_error.html {
@@ -41,7 +43,9 @@
         }
 
         location  / {
-            rewrite ^/(.*)$ http://2013.redisconf.com/$1 last;
+            rewrite ^/(.*)$ https://tito.io/redistogo/redis-2013 last;
+
+            # rewrite ^/(.*)$ http://2013.redisconf.com/$1 last;
         }
         error_page  404 500 502 503 504  /andyet_error.html;
         location = /andyet_error.html {
