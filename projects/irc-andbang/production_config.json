@@ -31,8 +31,8 @@
         "secret": "%(andyet.secret)s"
     },
     "andyetAPIs": {
-        "shippy": "%(andyet.apiUrl)s",
-        "apps": "%(andyet.appSiteUrl)s"
+        "shippy": "%(andyet.shippyAPI)s",
+        "apps": "%(andyet.appsUrl)s"
     },
     "intercom": {
         "id": "z6ub4pxr", 
