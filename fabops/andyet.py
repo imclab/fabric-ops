@@ -17,6 +17,18 @@ import fabops.common
 import fabops.redis
 import fabops.nodejs
 
+
+@task
+def install_kenkou():
+    if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+        if not fabops.common.user_exists('kenkou'):
+            fabops.users.adduser('kenkou', 'ops.keys')
+
+        with settings(user='kenkou', use_sudo=True):
+            run('virtualenv kenkou')
+            run('cd kenkou; . bin/activate; pip install https://github.com/bear/bearlib.git; pip install requests')
+            run('cd kenkou; . bin/activate; git clone https://github.com/bear/kenkou.git')
+
 @task
 def install_reports():
     if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
@@ -170,6 +182,9 @@ def getProjectConfig(projectName, ci, hostName, itemName=None):
             for k in env.overrides[hostName]:
                 projectConfig[k] = env.overrides[hostName][k]
 
+        if itemName in env.overrides['ci_project'] and ci in env.overrides['ci_project'][itemName]:
+            for k in env.overrides['ci_project'][itemName][ci]:
+                projectConfig[k] = env.overrides['ci_project'][itemName][ci][k]
 
     return projectConfig
 
@@ -359,7 +374,7 @@ def deployStatic(projectName, projectConfig):
                 run('cp -r %s/* %s' % (workDir, targetDir))
 
 def updateProject(projectName, projectConfig):
-    if 'nginx.sitename' in projectConfig:
+    if 'nginx.sitename' in projectConfig and os.path.exists(os.path.join(projectConfig['configDir'], '%s.nginx' % projectConfig['name'])):
         execute('fabops.nginx.deploy', projectConfig)
 
     if 'prosody.vhost' in projectConfig:
