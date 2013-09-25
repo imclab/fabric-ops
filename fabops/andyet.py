@@ -218,14 +218,7 @@ def deployProject(projectName, ci):
 
 _logstash_bucker = """
         file {
-                type => "bucker_app"
-                path => ["/var/log/%s/*.log"]
-                exclude => ["*.gz"]
-                sincedb_path => "/opt/logstash"
-                debug => true
-        }
-        file {
-                type => "bucker_console"
+                type => "console"
                 path => ["/var/log/%s/current"]
                 exclude => ["*.gz"]
                 sincedb_path => "/opt/logstash"
