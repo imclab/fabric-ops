@@ -40,9 +40,9 @@
     "http": {
         "listen": "127.0.0.1",
         "port": %(dns.apps-andyet.port)s,
-        "cert": "ssl-keys/star_andyet_com.crt",
+        "cert": "%(nginx.ssl_cert)s",
         "ca": "ssl-keys/gd_bundle.crt",
-        "key": "ssl-keys/star_andyet_com.key"
+        "key": "%(nginx.ssl_key)s"
     },
     "session": {
         "secret": "daBang",

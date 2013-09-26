@@ -1,6 +1,6 @@
 {
     "isDev": false,
-    "baseUrl": "%(nginx.url)s",
+    "baseUrl": "%(base.url)s",
     "session": {
         "host": "localhost",
         "port": 6380,
