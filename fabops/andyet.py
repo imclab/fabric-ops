@@ -19,6 +19,25 @@ import fabops.nodejs
 
 
 @task
+def install_ngrok():
+    if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+        if not fabops.common.user_exists('ngrokd'):
+            fabops.users.adduser('ngrokd', 'ops.keys')
+
+        for p in ('mercurial', 'bzr'):
+            fabops.common.install_package(p)
+        # wget https://godeb.s3.amazonaws.com/godeb-amd64.tar.gz
+        # tar xf godeb-amd64.tar.gz
+        # ./godeb install 1.1.2
+
+        with settings(user='ngrokd', use_sudo=True):
+            if exists('/home/ngrokd/ngrok'):
+                run('rm -rf /home/ngrokd/ngrok')
+
+            run('git clone https://github.com/inconshreveable/ngrok.git')
+            run('cd ngrok && make')
+
+@task
 def install_kenkou():
     if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
         if not fabops.common.user_exists('kenkou'):
