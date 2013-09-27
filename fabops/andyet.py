@@ -19,23 +19,31 @@ import fabops.nodejs
 
 
 @task
-def install_ngrok():
-    if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+def install_ngrokd():
+    if fabops.common.user_exists('ops'):
         if not fabops.common.user_exists('ngrokd'):
-            fabops.users.adduser('ngrokd', 'ops.keys')
+            sudo('useradd --system ngrokd')
 
-        for p in ('mercurial', 'bzr'):
-            fabops.common.install_package(p)
-        # wget https://godeb.s3.amazonaws.com/godeb-amd64.tar.gz
-        # tar xf godeb-amd64.tar.gz
-        # ./godeb install 1.1.2
+        with settings(user='ops', use_sudo=True):
+            if not exists('ngrok-1.3'):
+                put(os.path.join(env.our_path, 'keys', 'star_testy.io.key'), '/home/ops/star_testy.io.key')
+                put(os.path.join(env.our_path, 'keys', 'star_testy.io.pem'), '/home/ops/star_testy.io.pem')
 
-        with settings(user='ngrokd', use_sudo=True):
-            if exists('/home/ngrokd/ngrok'):
-                run('rm -rf /home/ngrokd/ngrok')
+                sudo('mkdir -p /var/log/ngrokd')
+                sudo('chown ngrokd:ngrokd /var/log/ngrokd')
 
-            run('git clone https://github.com/inconshreveable/ngrok.git')
-            run('cd ngrok && make')
+                run('wget https://github.com/inconshreveable/ngrok/archive/1.3.tar.gz')
+                run('tar xf 1.3.tar.gz')
+
+            with cd('ngrok-1.3'):
+                run('make')
+
+            d = { 'name': 'ngrokd',
+                  'logDir': '/var/log/ngrokd',
+                  'deploy_user': 'ops'
+                }
+
+            execute('fabops.runit.update_app', d, False, 'templates/ngrokd_runit')
 
 @task
 def install_kenkou():

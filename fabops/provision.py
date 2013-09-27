@@ -412,3 +412,24 @@ def secteam():
             run('./configure')
             run('make')
             run('make install')
+
+@task
+def tunnel():
+    """baseline install for the tunnel server
+    """
+    with settings(user='root'):
+        add_ops_user()
+        apt_update()
+        apt_upgrade()
+        disablex11()
+        disableroot()
+        disablepasswordauth()
+        processcontrol()
+
+        for p in ('ntp', 'fail2ban', 'screen', 'unzip', 'wget', 'mercurial', 'bzr', 'git',
+                 ):
+            fabops.common.install_package(p)
+        
+        run('wget https://godeb.s3.amazonaws.com/godeb-amd64.tar.gz')
+        run('tar xf godeb-amd64.tar.gz')
+        run('./godeb install 1.1.2')
