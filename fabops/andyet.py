@@ -19,6 +19,44 @@ import fabops.nodejs
 
 
 @task
+def install_book():
+    if fabops.common.user_exists('ops') and exists('/etc/andyet_ops_bootstrap', use_sudo=True):
+        if not fabops.common.user_exists('bookbuilder'):
+            fabops.users.adduser('book', 'ops.keys')
+            fabops.users.adddeploykey('book', os.path.join(env.our_path, 'keys', 'id_rsa-deploy-app-bookbuilder'), 
+                                      'id_rsa-deploy-app-bookbuilder')
+            fabops.users.adddeploykey('book', os.path.join(env.our_path, 'keys', 'id_rsa-deploy-app-humanjavascript'), 
+                                      'id_rsa-deploy-app-humanjavascript')
+
+        fabops.common.install_package('xvfb xdg-utils imagemagick python-imaging python-mechanize python-lxml python-dateutil python-cssutils python-beautifulsoup python-dnspython python-poppler libpodofo-utils libwmf-bin python-chm')
+        fabops.common.install_package('haskell-platform haskell-platform-doc haskell-platform-prof')
+
+        fabops.nodejs.install_Node('book', 'v0.10.12', '/home/book')
+
+        with settings(user='book', use_sudo=True):
+            if not exists('/usr/local/bin/kindlegen'):
+                run('mkdir -p kindlegen')
+                with cd('kindlegen'):
+                    run('wget http://kindlegen.s3.amazonaws.com/kindlegen_linux_2.6_i386_v2_9.tar.gz')
+                    run('tar xf kindlegen_linux_2.6_i386_v2_9.tar.gz')
+                    sudo('ln -s /home/book/kindlegen/kindlegen /usr/local/bin/kindlegen')
+
+            if not exists('/home/book/pandoc'):
+                run('mkdir -p pandoc')
+                run('cabal upgrade')
+                with cd('pandoc'):
+                    run('wget https://pandoc.googlecode.com/files/pandoc-1.12.0.1.tar.gz')
+                    run('tar xf pandoc-1.12.0.1.tar.gz')
+                    with cd('pandoc-1.12.0'):
+                        run('cabal install')
+
+            if not exists('/home/book/Dropbox'):
+                run('cd ~ && wget -O - "https://www.dropbox.com/download?plat=lnx.x86_64" | tar xzf -')
+
+        # add install calibre and init.d script
+        # add dropbox init.d setup
+
+@task
 def install_ngrokd():
     if fabops.common.user_exists('ops'):
         if not fabops.common.user_exists('ngrokd'):
