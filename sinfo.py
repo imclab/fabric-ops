@@ -11,6 +11,7 @@ from bearlib import BearConfig
 _data_centers = [ 'DFW', 'ORD' ]
 _commands     = [ 'list' ]
 _config_file  = '~/.rackspace.cfg'
+_marker       = '##### auto-generated for &yet #####'
 
 _usage = """
     Usage: python sinfo.py [options] COMMAND
@@ -29,6 +30,9 @@ _usage = """
                           Optionally give a SERVER name to focus on.
                           If a datacenter has been given, the list will only
                           contain those servers.
+        hosts           generate output that can be used in /etc/hosts
+        ssh             generate output that can be used in ~/.ssh/config
+
 
     Config File:
         [rackspace_cloud]
@@ -107,8 +111,6 @@ def getServerInfo(serverName, serverList):
     else:
         s = ' in datacenter %s' % cfg.datacenter
 
-    print serverName, serverName in serverList
-
     if serverName not in serverList:
         print '%s not found %s' % (serverName, s)
     else:
@@ -118,6 +120,56 @@ def getServerInfo(serverName, serverList):
             result[key] = item.__getattr__(key)
 
     return result
+
+_hosts_config = """%(accessIPv4)s\t%(name)s\n"""
+def generateHostsFile(servers):
+    hosts = []
+
+    f = False
+    for line in open('/etc/hosts', 'r').readlines():
+        if line.startswith(_marker):
+            f = not f
+        else:
+            if not f:
+                hosts.append(line)
+
+    hosts.append('\n%s\n' % _marker)
+
+    for s in servers:
+        r = getServerInfo(s, servers)
+        hosts.append(_hosts_config % r)
+
+    hosts.append('\n%s\n' % _marker)
+
+    open('/tmp/_hosts_', 'w+').write(''.join(hosts))
+
+_ssh_config = """Host %(name)s
+User ops
+StrictHostKeyChecking no
+IdentityFile ~/.ssh/id_rsa
+
+"""
+
+def generateConfigFile(servers):
+    hosts = []
+
+    f = False
+    for line in open(os.path.expanduser('~/.ssh/config'), 'r').readlines():
+        if line.startswith(_marker):
+            f = not f
+        else:
+            if not f:
+                hosts.append(line)
+
+    hosts.append('\n%s\n' % _marker)
+
+    for s in servers:
+        r = getServerInfo(s, servers)
+        hosts.append(_ssh_config % r)
+
+    hosts.append('\n%s\n' % _marker)
+
+    open('/tmp/_ssh_config_', 'w+').write(''.join(hosts))
 
 def getCommandParam(cmdText, commands):
     # index() will return an exception if the item
@@ -142,13 +194,14 @@ if __name__ == '__main__':
             datacenters = [ datacenter ]
 
         servers = loadServers(datacenters)
-        results = []
 
         if 'list' in commands:
             serverName = getCommandParam('list', commands)
 
             if serverName in _commands or len(serverName) == 0:
                 serverName = None
+
+            results = []
 
             if serverName is not None:
                 r = getServerInfo(serverName, servers)
@@ -160,4 +213,10 @@ if __name__ == '__main__':
                     if r is not None:
                         results.append(r)
 
-        print json.dumps(results)
+            print json.dumps(results)
+
+        elif 'hosts' in commands:
+            generateHostsFile(servers)
+        elif 'ssh' in commands:
+            generateConfigFile(servers)
+
