@@ -3,9 +3,9 @@
 import os
 import time
 import json
+import argparse
 
 import pyrax
-from bearlib import BearConfig
 
 
 _data_centers = [ 'DFW', 'ORD' ]
@@ -14,44 +14,34 @@ _config_file  = '~/.rackspace.cfg'
 _marker       = '##### auto-generated for &yet #####'
 
 _usage = """
-    Usage: python sinfo.py [options] COMMAND
+  list    list details for the servers
+            If a server name is specified, the list will
+            only contain that server
+            If a datacenter has been given, the list will only
+            contain those servers
+  hosts   generate output that can be used in /etc/hosts
+  ssh     generate output that can be used in ~/.ssh/config
 
-    Where [options] can be one of:
-        -d | --datacenter  datacenter to work within, choices are
-                           %s
-                           default is all of them
-        -c | --config      where to retrieve configuration items and the
-                           rackspace API keys.
-                           default is %s
-
-    and where COMMAND is one of:
-        list SERVER
-                        list details for the servers.
-                          Optionally give a SERVER name to focus on.
-                          If a datacenter has been given, the list will only
-                          contain those servers.
-        hosts           generate output that can be used in /etc/hosts
-        ssh             generate output that can be used in ~/.ssh/config
-
-
-    Config File:
-        [rackspace_cloud]
-        username = USERNAME
-        api_key = KEY
-""" % (_data_centers, _config_file)
+  Config File Format:
+      [rackspace_cloud]
+      username = USERNAME
+      api_key = KEY
+"""
 
 def loadConfig():
-    cfg = BearConfig(_config_file)
+    parser = argparse.ArgumentParser(epilog=_usage, formatter_class=argparse.RawDescriptionHelpFormatter)
 
-    cfg.addConfig('datacenter', '-d', '--datacenter', 'ALL')
+    parser.add_argument('-c', '--config',     default=_config_file, help='where to retrieve configuration items and the rackspace API keys (default: %(default)s)')
+    parser.add_argument('-d', '--datacenter', default='ALL',        help='datacenter to work within (default: %(default)s)', choices=_data_centers)
+    parser.add_argument('-s', '--server',                           help='limit output to the named server')
 
-    cfg.load()
+    parser.add_argument('command', choices=['list', 'hosts', 'ssh'])
 
-    return cfg.options, cfg.args
+    return parser.parse_args()
 
 def initCredentials(datacenter):
     pyrax.set_setting("identity_type", "rackspace")
-    pyrax.set_credential_file(os.path.expanduser(cfg.configFile), datacenter)
+    pyrax.set_credential_file(os.path.expanduser(cfg.config), datacenter)
 
 def loadServers(datacenters):
     #flv = cs.flavors.find(name='1GB Standard Instance')
@@ -183,40 +173,31 @@ def getCommandParam(cmdText, commands):
     return result
 
 if __name__ == '__main__':
-    cfg, commands = loadConfig()
+    cfg = loadConfig()
 
-    if len(commands) == 0:
-        print _usage
+    if cfg.datacenter == 'ALL':
+        datacenters = _data_centers
     else:
-        if cfg.datacenter == 'ALL':
-            datacenters = _data_centers
-        else:
-            datacenters = [ datacenter ]
+        datacenters = [ datacenter ]
 
-        servers = loadServers(datacenters)
+    servers = loadServers(datacenters)
 
-        if 'list' in commands:
-            serverName = getCommandParam('list', commands)
+    if cfg.command == 'list':
+        results = []
 
-            if serverName in _commands or len(serverName) == 0:
-                serverName = None
-
-            results = []
-
-            if serverName is not None:
-                r = getServerInfo(serverName, servers)
+        if cfg.server is None:
+            for s in servers:
+                r = getServerInfo(s, servers)
                 if r is not None:
                     results.append(r)
-            else:
-                for s in servers:
-                    r = getServerInfo(s, servers)
-                    if r is not None:
-                        results.append(r)
+        else:
+            r = getServerInfo(cfg.server, servers)
+            if r is not None:
+                results.append(r)
 
-            print json.dumps(results)
+        print json.dumps(results)
 
-        elif 'hosts' in commands:
-            generateHostsFile(servers)
-        elif 'ssh' in commands:
-            generateConfigFile(servers)
-
+    elif cfg.command == 'hosts':
+        generateHostsFile(servers)
+    elif cfg.command == 'ssh':
+        generateConfigFile(servers)
